@@ -1,0 +1,18 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/trainqueue
+    username: trainqueue
+    password: trainqueue
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+server:
+  port: 8080
+
+trainqueue:
+  # worker-sim image the temporary launcher runs; built with `docker build -t worker-sim:latest worker-sim`
+  worker-image: worker-sim:latest

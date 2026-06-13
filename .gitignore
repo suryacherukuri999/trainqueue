@@ -1,0 +1,15 @@
+# build output
+target/
+dist/
+*.tsbuildinfo
+
+# dependencies
+node_modules/
+
+# logs
+*.log
+
+# os / editor
+.DS_Store
+.idea/
+*.iml

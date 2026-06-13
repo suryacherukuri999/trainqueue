@@ -1,18 +1,10 @@
 spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5433/trainqueue
-    username: trainqueue
-    password: trainqueue
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    open-in-view: false
-  flyway:
-    enabled: true
+  main:
+    web-application-type: none
   kafka:
     bootstrap-servers: localhost:9092
     consumer:
-      group-id: api
+      group-id: scheduler
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
@@ -20,11 +12,17 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
-server:
-  port: 8080
-
 trainqueue:
   topics:
     submitted: jobs.submitted
     status: jobs.status
     control: jobs.control
+  api:
+    base-url: http://localhost:8080
+  pool:
+    cpu-millis: 4000
+    mem-mb: 8192
+  retry:
+    base-backoff-ms: 2000
+    max-backoff-ms: 30000
+  heartbeat-ms: 10000

@@ -56,13 +56,23 @@ public class Job {
         this.createdAt = Instant.now();
     }
 
-    public void start() {
+    public void markRunning(int attempt) {
         this.status = JobStatus.RUNNING;
-        this.startedAt = Instant.now();
+        this.attempt = attempt;
+        if (this.startedAt == null) {
+            this.startedAt = Instant.now();
+        }
     }
 
-    public void finish(JobStatus terminal) {
+    public void markTerminal(JobStatus terminal, int attempt) {
         this.status = terminal;
+        this.attempt = attempt;
+        this.finishedAt = Instant.now();
+    }
+
+    /** Operator-initiated cancel from the API; the scheduler stops the container out of band. */
+    public void cancel() {
+        this.status = JobStatus.CANCELLED;
         this.finishedAt = Instant.now();
     }
 

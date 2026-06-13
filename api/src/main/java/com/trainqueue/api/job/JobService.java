@@ -3,6 +3,9 @@ package com.trainqueue.api.job;
 import com.trainqueue.api.exception.InvalidTransitionException;
 import com.trainqueue.api.exception.JobNotFoundException;
 import com.trainqueue.api.job.dto.CreateJobRequest;
+import com.trainqueue.api.messaging.CancelCommand;
+import com.trainqueue.api.messaging.JobEventPublisher;
+import com.trainqueue.api.messaging.JobSubmittedEvent;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,13 +20,13 @@ import java.util.UUID;
 public class JobService {
 
     private final JobRepository jobs;
-    private final LocalDockerLauncher launcher;
+    private final JobEventPublisher publisher;
     private final String defaultImage;
 
-    public JobService(JobRepository jobs, LocalDockerLauncher launcher,
-                      @Value("${trainqueue.worker-image}") String defaultImage) {
+    public JobService(JobRepository jobs, JobEventPublisher publisher,
+                      @Value("${trainqueue.default-image:worker-sim:latest}") String defaultImage) {
         this.jobs = jobs;
-        this.launcher = launcher;
+        this.publisher = publisher;
         this.defaultImage = defaultImage;
     }
 
@@ -43,19 +46,14 @@ public class JobService {
                 req.maxRetries() == null ? 0 : req.maxRetries());
         jobs.save(job);
 
-        // Launch only after this transaction commits. The launcher runs on a
-        // background thread; if it starts before the QUEUED row is visible, its
-        // RUNNING update reads stale state and is silently dropped, stranding the
-        // job in QUEUED.
-        LocalDockerLauncher.LaunchSpec spec = new LocalDockerLauncher.LaunchSpec(
-                job.getId(), image, job.getEpochs(), job.getFailAtEpoch(),
-                job.getCpuMillis(), job.getMemMb());
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                launcher.launch(spec);
-            }
-        });
+        // Publish only after commit, so the scheduler never consumes a submission
+        // for a row that isn't yet visible (and a rolled-back submit emits nothing).
+        JobSubmittedEvent event = new JobSubmittedEvent(
+                job.getId(), job.getName(), job.getDockerImage(), job.getCommand(),
+                job.getEpochs(), job.getFailAtEpoch(), job.getPriority(),
+                job.getCpuMillis(), job.getMemMb(), job.getAttempt(), job.getMaxRetries(),
+                job.getCreatedAt());
+        afterCommit(() -> publisher.publishSubmitted(event));
         return job;
     }
 
@@ -77,8 +75,17 @@ public class JobService {
         if (!job.getStatus().canTransitionTo(JobStatus.CANCELLED)) {
             throw new InvalidTransitionException(job.getStatus(), JobStatus.CANCELLED);
         }
-        job.finish(JobStatus.CANCELLED);
-        launcher.stop(id);
+        job.cancel();
+        afterCommit(() -> publisher.publishCancel(new CancelCommand(id)));
         return job;
+    }
+
+    private void afterCommit(Runnable action) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 }

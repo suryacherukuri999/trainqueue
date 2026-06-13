@@ -86,7 +86,7 @@ class JobControllerTest {
     @Test
     void cancelReturnsCancelledJob() throws Exception {
         Job job = sampleJob();
-        job.finish(JobStatus.CANCELLED);
+        job.cancel();
         when(service.cancel(any())).thenReturn(job);
 
         mvc.perform(post("/api/jobs/{id}/cancel", job.getId()))

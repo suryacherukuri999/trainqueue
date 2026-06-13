@@ -10,11 +10,12 @@ export function SubmitForm({ onSubmit }: Props) {
   const [epochs, setEpochs] = useState(5);
   const [priority, setPriority] = useState(1);
   const [failAtEpoch, setFailAtEpoch] = useState("");
+  const [maxRetries, setMaxRetries] = useState(0);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
-    const req: CreateJobRequest = { name: name.trim(), epochs, priority };
+    const req: CreateJobRequest = { name: name.trim(), epochs, priority, maxRetries };
     if (failAtEpoch !== "") req.failAtEpoch = Number(failAtEpoch);
     onSubmit(req);
     setName("");
@@ -53,6 +54,15 @@ export function SubmitForm({ onSubmit }: Props) {
           placeholder="optional"
           value={failAtEpoch}
           onChange={(e) => setFailAtEpoch(e.target.value)}
+        />
+      </label>
+      <label>
+        Max retries
+        <input
+          type="number"
+          min={0}
+          value={maxRetries}
+          onChange={(e) => setMaxRetries(Number(e.target.value))}
         />
       </label>
       <button type="submit">Submit job</button>

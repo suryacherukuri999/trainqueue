@@ -28,6 +28,7 @@ export interface CreateJobRequest {
   epochs: number;
   priority: number;
   failAtEpoch?: number;
+  maxRetries?: number;
 }
 
 export const TERMINAL: ReadonlySet<JobStatus> = new Set([

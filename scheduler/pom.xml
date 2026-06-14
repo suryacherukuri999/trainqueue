@@ -20,6 +20,7 @@
         <java.version>21</java.version>
         <docker-java.version>3.4.0</docker-java.version>
         <awssdk.version>2.28.16</awssdk.version>
+        <fabric8.version>6.13.4</fabric8.version>
     </properties>
 
     <dependencies>
@@ -71,6 +72,11 @@
             <groupId>com.github.docker-java</groupId>
             <artifactId>docker-java-transport-httpclient5</artifactId>
             <version>${docker-java.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.fabric8</groupId>
+            <artifactId>kubernetes-client</artifactId>
+            <version>${fabric8.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -5,7 +5,10 @@ Submit a job in the browser; a scheduler places and runs it in a container; its
 logs, status, and loss curve stream back live; and its logs, artifacts, and run
 metrics are persisted for search and download.
 
-This is **milestone 4** — search, artifacts, and metrics:
+Jobs can run as local containers or as Kubernetes Jobs; CI builds/tests every
+service and publishes images, and a workflow deploys the stack to EC2.
+
+This is the architecture through **milestone 4** — search, artifacts, and metrics:
 
 ```
 console (React) ──HTTP──▶ api (Spring Boot) ──▶ Postgres        (job records)
@@ -59,6 +62,18 @@ curl "localhost:8080/api/jobs/$JOB/logs?q=epoch"       # full-text log search (E
 curl "localhost:8080/api/jobs/$JOB/logs?q=epoch&from=<ms>&to=<ms>"   # narrowed by time
 ```
 Earlier milestones (capacity, retry, crash recovery, live streaming) are covered in the service READMEs.
+
+## Kubernetes, CI/CD, and deploy (milestone 5)
+- **Kubernetes** — the scheduler can run each job as a K8s Job (`LAUNCHER=k8s`,
+  fabric8). See [scheduler/README](scheduler/README.md#run-on-minikube) for minikube,
+  and [deploy/k8s/](deploy/k8s/) for service manifests.
+- **CI** — [.github/workflows/ci.yml](.github/workflows/ci.yml) builds + tests api,
+  scheduler, gateway, and console on every push/PR, and pushes Docker images for
+  all four services + worker-sim to GHCR on `main`.
+- **Deploy** — [.github/workflows/deploy.yml](.github/workflows/deploy.yml) (manual)
+  SSHes to EC2 and runs `docker compose pull && up -d` with
+  [deploy/aws/docker-compose.prod.yml](deploy/aws/docker-compose.prod.yml)
+  (infra + all services on one box; console on port 80 proxies `/api` and `/ws`).
 
 ## Tests
 ```bash

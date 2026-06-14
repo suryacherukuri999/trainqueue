@@ -1,6 +1,7 @@
 import type { CreateJobRequest, Job, LogLine, Metrics } from "./types";
 
-const BASE = "http://localhost:8080/api";
+// Same-origin "/api" in the deployed build (nginx proxies it); localhost in dev.
+const BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8080/api";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {

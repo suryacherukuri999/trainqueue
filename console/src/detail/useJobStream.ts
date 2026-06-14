@@ -1,8 +1,18 @@
 import { useEffect, useReducer, useState } from "react";
 import { detailReducer, initialDetail, type StreamEvent } from "./detailReducer";
 
-const WS_URL = "ws://localhost:8081/ws";
 const MAX_BACKOFF_MS = 10000;
+
+// A leading-"/" value (deployed build) is resolved against the page origin so the
+// browser opens a same-origin socket the nginx proxy forwards to the gateway.
+function wsUrl(): string {
+  const raw = import.meta.env.VITE_WS_URL ?? "ws://localhost:8081/ws";
+  if (raw.startsWith("/")) {
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    return `${proto}//${location.host}${raw}`;
+  }
+  return raw;
+}
 
 /** Subscribes to a job's live event stream over WebSocket, reconnecting with backoff. */
 export function useJobStream(jobId: string) {
@@ -16,7 +26,7 @@ export function useJobStream(jobId: string) {
     let ws: WebSocket;
 
     const connect = () => {
-      ws = new WebSocket(WS_URL);
+      ws = new WebSocket(wsUrl());
       ws.onopen = () => {
         setConnected(true);
         backoff = 1000;

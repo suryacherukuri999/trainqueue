@@ -54,8 +54,31 @@ running (for startup reconcile), and the worker image built
 TRAINQUEUE_POOL_CPUMILLIS=2000 ./mvnw spring-boot:run
 ```
 
+## Launcher: docker or Kubernetes
+The `LAUNCHER` env var selects how jobs run (default `docker`):
+
+- `LAUNCHER=docker` — run each job as a local container via docker-java (with the
+  `/output` artifact mount).
+- `LAUNCHER=k8s` — run each job as a Kubernetes Job (fabric8, `backoffLimit 0`,
+  `restartPolicy: Never`, cpu/memory requests from the job spec). Retries stay in
+  our scheduler. Artifacts (the host `/output` mount) are docker-only and skipped.
+
+### Run on minikube
+```bash
+minikube start
+docker build -t worker-sim:latest worker-sim          # from the repo root
+minikube image load worker-sim:latest                 # make it available in-cluster
+# point at minikube's kubeconfig, then run the scheduler against it:
+LAUNCHER=k8s ./mvnw spring-boot:run
+
+kubectl get jobs -w     # watch trainqueue-<id> Jobs created and complete
+kubectl get pods
+```
+The launcher uses the ambient kubeconfig; in-cluster it uses its ServiceAccount
+(see `deploy/k8s/scheduler.yaml`).
+
 ## Test
 ```bash
-./mvnw test     # resource pool (fits/doesn't/frees), priority ordering, retry policy
+./mvnw test     # resource pool (fits/doesn't/frees), priority ordering, retry policy, run-document mapper
 ```
 Unit tests need neither Kafka nor Docker; the cross-service behaviour is exercised end to end (see the root README).

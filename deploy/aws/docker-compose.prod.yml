@@ -1,0 +1,95 @@
+# One-box production stack for EC2: infra + all four services from GHCR.
+# The console (port 80) proxies /api and /ws to the api and gateway internally.
+# Replace the image owner if you fork this repo.
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: trainqueue
+      POSTGRES_USER: trainqueue
+      POSTGRES_PASSWORD: trainqueue
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trainqueue -d trainqueue"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  kafka:
+    image: apache/kafka:3.8.1
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+  redis:
+    image: redis:7
+
+  mongodb:
+    image: mongo:7
+    volumes: [mongodata:/data/db]
+
+  localstack:
+    image: localstack/localstack:3
+    environment:
+      SERVICES: s3
+
+  elasticsearch:
+    image: elasticsearch:8.13.4
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+
+  api:
+    image: ghcr.io/suryacherukuri999/trainqueue-api:latest
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/trainqueue
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/trainqueue
+      SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
+      TRAINQUEUE_S3_ENDPOINT: http://localstack:4566
+      TRAINQUEUE_DEFAULT_IMAGE: ghcr.io/suryacherukuri999/trainqueue-worker-sim:latest
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  scheduler:
+    image: ghcr.io/suryacherukuri999/trainqueue-scheduler:latest
+    environment:
+      LAUNCHER: docker
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/trainqueue
+      SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
+      TRAINQUEUE_API_BASE_URL: http://api:8080
+      TRAINQUEUE_S3_ENDPOINT: http://localstack:4566
+      TRAINQUEUE_OUTPUT_DIR: /tmp/trainqueue-output
+    volumes:
+      # launch sibling worker containers on the host daemon; share the artifact dir
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/trainqueue-output:/tmp/trainqueue-output
+
+  gateway:
+    image: ghcr.io/suryacherukuri999/trainqueue-gateway:latest
+    environment:
+      REDIS_URL: redis://redis:6379
+
+  console:
+    image: ghcr.io/suryacherukuri999/trainqueue-console:latest
+    ports:
+      - "80:80"
+    depends_on: [api, gateway]
+
+volumes:
+  pgdata:
+  mongodata:

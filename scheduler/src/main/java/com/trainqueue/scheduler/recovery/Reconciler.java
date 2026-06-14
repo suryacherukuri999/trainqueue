@@ -1,6 +1,6 @@
 package com.trainqueue.scheduler.recovery;
 
-import com.trainqueue.scheduler.core.DockerLauncher;
+import com.trainqueue.scheduler.core.JobLauncher;
 import com.trainqueue.scheduler.core.Scheduler;
 import com.trainqueue.scheduler.messaging.JobSubmittedEvent;
 import org.slf4j.Logger;
@@ -25,10 +25,10 @@ public class Reconciler {
     private static final Logger log = LoggerFactory.getLogger(Reconciler.class);
 
     private final ApiClient api;
-    private final DockerLauncher launcher;
+    private final JobLauncher launcher;
     private final Scheduler scheduler;
 
-    public Reconciler(ApiClient api, DockerLauncher launcher, Scheduler scheduler) {
+    public Reconciler(ApiClient api, JobLauncher launcher, Scheduler scheduler) {
         this.api = api;
         this.launcher = launcher;
         this.scheduler = scheduler;
@@ -44,20 +44,20 @@ public class Reconciler {
             return;
         }
 
-        Map<UUID, DockerLauncher.Managed> containers = new HashMap<>();
-        for (DockerLauncher.Managed m : launcher.listManaged()) {
-            containers.put(m.jobId(), m);
+        Map<UUID, JobLauncher.Managed> managed = new HashMap<>();
+        for (JobLauncher.Managed m : launcher.listManaged()) {
+            managed.put(m.jobId(), m);
         }
 
-        log.info("reconciling {} RUNNING job(s) against {} worker container(s)",
-                runningJobs.size(), containers.size());
+        log.info("reconciling {} RUNNING job(s) against {} worker job(s)",
+                runningJobs.size(), managed.size());
         for (ApiClient.JobInfo job : runningJobs) {
             JobSubmittedEvent event = toEvent(job);
-            DockerLauncher.Managed container = containers.get(job.id());
-            if (container != null && container.running()) {
-                scheduler.adopt(event, container.containerId());
+            JobLauncher.Managed handle = managed.get(job.id());
+            if (handle != null && handle.running()) {
+                scheduler.adopt(event, handle.handle());
             } else {
-                log.info("job {} was RUNNING but its container is gone; re-queueing", job.id());
+                log.info("job {} was RUNNING but its worker is gone; re-queueing", job.id());
                 scheduler.submit(event);
             }
         }

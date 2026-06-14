@@ -1,0 +1,25 @@
+name: deploy
+
+# Manual deploy to the EC2 box. Requires repo secrets:
+#   EC2_HOST, EC2_USER, EC2_SSH_KEY  (ssh access)
+#   GHCR_PAT                         (read:packages token to pull images on the box)
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: pull + restart the stack over ssh
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/trainqueue
+            git pull --ff-only
+            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker compose -f deploy/aws/docker-compose.prod.yml pull
+            docker compose -f deploy/aws/docker-compose.prod.yml up -d

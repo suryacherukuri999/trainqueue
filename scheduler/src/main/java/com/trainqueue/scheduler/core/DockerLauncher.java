@@ -15,6 +15,7 @@ import com.github.dockerjava.api.model.WaitResponse;
 import com.trainqueue.scheduler.messaging.JobSubmittedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
@@ -25,7 +26,8 @@ import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
 @Component
-public class DockerLauncher {
+@ConditionalOnProperty(name = "LAUNCHER", havingValue = "docker", matchIfMissing = true)
+public class DockerLauncher implements JobLauncher {
 
     private static final Logger log = LoggerFactory.getLogger(DockerLauncher.class);
     private static final String PREFIX = "trainqueue-";
@@ -34,9 +36,6 @@ public class DockerLauncher {
 
     public DockerLauncher(DockerClient docker) {
         this.docker = docker;
-    }
-
-    public record Managed(UUID jobId, String containerId, boolean running) {
     }
 
     /** Create and start a worker-sim container with /output bind-mounted; returns its id. */
@@ -139,6 +138,7 @@ public class DockerLauncher {
     }
 
     /** All trainqueue worker containers currently known to docker (running or not). */
+    @Override
     public List<Managed> listManaged() {
         List<Managed> out = new ArrayList<>();
         for (Container c : docker.listContainersCmd().withShowAll(true).exec()) {

@@ -45,7 +45,7 @@ public class Scheduler {
             Comparator.comparingInt(JobSubmittedEvent::priority).reversed()
                     .thenComparing(JobSubmittedEvent::createdAt);
 
-    private final DockerLauncher launcher;
+    private final JobLauncher launcher;
     private final StatusPublisher publisher;
     private final RedisStreamPublisher redisStream;
     private final JobLogProcessor logProcessor;
@@ -68,7 +68,7 @@ public class Scheduler {
     private volatile boolean active;
     private Thread placementThread;
 
-    public Scheduler(DockerLauncher launcher, StatusPublisher publisher, RedisStreamPublisher redisStream,
+    public Scheduler(JobLauncher launcher, StatusPublisher publisher, RedisStreamPublisher redisStream,
                      JobLogProcessor logProcessor, CompletionHandler completion, ArtifactStore artifacts,
                      SchedulerProperties props) {
         this.launcher = launcher;

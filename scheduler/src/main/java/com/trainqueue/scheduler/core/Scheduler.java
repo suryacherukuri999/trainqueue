@@ -246,6 +246,9 @@ public class Scheduler {
         launcher.remove(rc.containerId());
         if (wasCancelled) {
             log.info("job {} was cancelled; suppressing exit (code {})", jobId, exitCode);
+            // Overwrite the cached snapshot (a late metric may have re-SET it to RUNNING)
+            // so cache-aside reads agree with the api's CANCELLED.
+            redisStream.publishTerminal(rc.event(), rc.startedAt(), Instant.now(), JobStatus.CANCELLED);
             completion.onTerminal(rc.event());
             return;
         }

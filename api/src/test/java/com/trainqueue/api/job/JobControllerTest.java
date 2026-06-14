@@ -77,7 +77,7 @@ class JobControllerTest {
     @Test
     void getMissingReturns404() throws Exception {
         UUID id = UUID.randomUUID();
-        when(service.get(id)).thenThrow(new JobNotFoundException(id));
+        when(service.find(id)).thenThrow(new JobNotFoundException(id));
 
         mvc.perform(get("/api/jobs/{id}", id))
                 .andExpect(status().isNotFound());

@@ -18,6 +18,10 @@ worker-sim container, and reports status back on Kafka.
   job as `attempt+1` after exponential backoff; otherwise it publishes `FAILED`.
 - **Heartbeat** — every 10s it inspects tracked containers; one that has vanished
   is treated as a failure and runs the retry path.
+- **Live streaming** — it follows each container's stdout and, per metric line,
+  `PUBLISH`es to Redis `job:{id}:events` (fanned out by the gateway) and `SET`s a
+  cached snapshot at `job:{id}:state` (EX 1h) for the api's cache-aside read.
+  Status changes go on the same channel.
 - **Crash recovery** — on startup it reads the api's `RUNNING` jobs and reconciles
   them against live containers: a container that survived the restart is
   re-adopted (re-attach the exit watcher); a job whose container is gone is

@@ -1,11 +1,14 @@
 package com.trainqueue.api.job.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.trainqueue.api.job.Job;
 import com.trainqueue.api.job.JobStatus;
 
 import java.time.Instant;
 import java.util.UUID;
 
+// The cached Redis snapshot carries extra live fields (epoch/loss/accuracy); ignore them here.
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record JobResponse(
         UUID id,
         String name,

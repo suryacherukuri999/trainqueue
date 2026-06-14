@@ -45,7 +45,7 @@ public class JobController {
 
     @GetMapping("/{id}")
     public JobResponse get(@PathVariable UUID id) {
-        return JobResponse.from(service.get(id));
+        return service.find(id);
     }
 
     @PostMapping("/{id}/cancel")

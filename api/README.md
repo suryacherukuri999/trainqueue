@@ -20,6 +20,11 @@ Postgres is published on host port **5433**).
 - `GET  /api/jobs/{id}` — one job.
 - `POST /api/jobs/{id}/cancel` — set `CANCELLED` and publish a cancel command to `jobs.control`.
 
+## Cache-aside reads
+`GET /api/jobs/{id}` reads the scheduler-maintained `job:{id}:state` snapshot from
+Redis first (logging a `cache hit`), and falls back to Postgres on a miss. Cancel
+evicts the key so the next read reflects `CANCELLED` from the database.
+
 ## State machine
 `JobStateMachine` applies `jobs.status` events. Only forward progress is accepted,
 ordered by `(attempt, state)` — this enforces legal transitions and makes the

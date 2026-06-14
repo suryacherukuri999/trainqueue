@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import type { Job } from "../types";
 import { TERMINAL } from "../types";
 import { StatusBadge } from "./StatusBadge";
@@ -28,7 +29,9 @@ export function JobTable({ jobs, onCancel }: Props) {
       <tbody>
         {jobs.map((job) => (
           <tr key={job.id}>
-            <td>{job.name}</td>
+            <td>
+              <Link to={`/jobs/${job.id}`}>{job.name}</Link>
+            </td>
             <td>
               <StatusBadge status={job.status} />
             </td>

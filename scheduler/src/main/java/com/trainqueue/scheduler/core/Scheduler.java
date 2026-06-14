@@ -4,6 +4,7 @@ import com.trainqueue.scheduler.config.SchedulerProperties;
 import com.trainqueue.scheduler.messaging.JobStatus;
 import com.trainqueue.scheduler.messaging.JobStatusEvent;
 import com.trainqueue.scheduler.messaging.JobSubmittedEvent;
+import com.trainqueue.scheduler.messaging.RedisStreamPublisher;
 import com.trainqueue.scheduler.messaging.StatusPublisher;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -13,6 +14,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -40,6 +42,7 @@ public class Scheduler {
 
     private final DockerLauncher launcher;
     private final StatusPublisher publisher;
+    private final RedisStreamPublisher redisStream;
     private final ResourcePool pool;
     private final RetryPolicy retryPolicy;
 
@@ -57,9 +60,11 @@ public class Scheduler {
     private volatile boolean active;
     private Thread placementThread;
 
-    public Scheduler(DockerLauncher launcher, StatusPublisher publisher, SchedulerProperties props) {
+    public Scheduler(DockerLauncher launcher, StatusPublisher publisher,
+                     RedisStreamPublisher redisStream, SchedulerProperties props) {
         this.launcher = launcher;
         this.publisher = publisher;
+        this.redisStream = redisStream;
         this.pool = new ResourcePool(props.pool().cpuMillis(), props.pool().memMb());
         this.retryPolicy = new RetryPolicy(props.retry().baseBackoffMs(), props.retry().maxBackoffMs());
     }
@@ -123,6 +128,7 @@ public class Scheduler {
         if (rc != null) {
             log.info("cancelling running job {}", jobId);
             launcher.stopAndRemove(rc.containerId());
+            redisStream.publishCancelled(jobId, rc.event().attempt());
         } else {
             log.info("cancel recorded for job {} (queued or not yet seen)", jobId);
         }
@@ -130,17 +136,22 @@ public class Scheduler {
 
     /** Re-attach to a worker container still running after a scheduler restart. */
     public void adopt(JobSubmittedEvent event, String containerId) {
+        Instant startedAt = Instant.now();
         lock.lock();
         try {
             if (running.containsKey(event.jobId())) {
                 return;
             }
             pool.reserve(event.cpuMillis(), event.memMb());
-            running.put(event.jobId(), new RunningContainer(event, containerId));
+            running.put(event.jobId(), new RunningContainer(event, containerId, startedAt));
         } finally {
             lock.unlock();
         }
+        redisStream.publishRunning(event, startedAt);
         launcher.watchExit(containerId, code -> onExit(event.jobId(), code));
+        // skip replaying history on re-adopt
+        launcher.streamLogs(containerId, startedAt.getEpochSecond(),
+                line -> redisStream.publishMetricLine(event, startedAt, line));
         log.info("re-adopted running job {} (container {})", event.jobId(), containerId);
     }
 
@@ -161,7 +172,7 @@ public class Scheduler {
                 } catch (Exception e) {
                     log.error("failed to launch job {}: {}", head.jobId(), e.toString());
                     release(head);
-                    failOrRetry(head);
+                    failOrRetry(head, Instant.now());
                 } finally {
                     lock.lock();
                 }
@@ -183,17 +194,20 @@ public class Scheduler {
     }
 
     private void launchAndTrack(JobSubmittedEvent event) {
+        Instant startedAt = Instant.now();
         String containerId = launcher.launch(event);
         boolean cancelledDuringLaunch;
         lock.lock();
         try {
-            running.put(event.jobId(), new RunningContainer(event, containerId));
+            running.put(event.jobId(), new RunningContainer(event, containerId, startedAt));
             cancelledDuringLaunch = cancelled.contains(event.jobId());
         } finally {
             lock.unlock();
         }
         publisher.publishStatus(JobStatusEvent.now(event.jobId(), event.attempt(), JobStatus.RUNNING));
+        redisStream.publishRunning(event, startedAt);
         launcher.watchExit(containerId, code -> onExit(event.jobId(), code));
+        launcher.streamLogs(containerId, 0, line -> redisStream.publishMetricLine(event, startedAt, line));
         log.info("launched job {} attempt {} (container {})", event.jobId(), event.attempt(), containerId);
         if (cancelledDuringLaunch) {
             launcher.stopAndRemove(containerId);
@@ -223,12 +237,13 @@ public class Scheduler {
         if (exitCode == 0) {
             log.info("job {} attempt {} succeeded", jobId, rc.event().attempt());
             publisher.publishStatus(JobStatusEvent.now(jobId, rc.event().attempt(), JobStatus.SUCCEEDED));
+            redisStream.publishTerminal(rc.event(), rc.startedAt(), Instant.now(), JobStatus.SUCCEEDED);
         } else {
-            failOrRetry(rc.event());
+            failOrRetry(rc.event(), rc.startedAt());
         }
     }
 
-    private void failOrRetry(JobSubmittedEvent event) {
+    private void failOrRetry(JobSubmittedEvent event, Instant startedAt) {
         int attempt = event.attempt();
         if (retryPolicy.shouldRetry(attempt, event.maxRetries())) {
             Duration backoff = retryPolicy.backoff(attempt);
@@ -240,6 +255,7 @@ public class Scheduler {
         } else {
             log.info("job {} attempt {} failed; no retries left -> FAILED", event.jobId(), attempt);
             publisher.publishStatus(JobStatusEvent.now(event.jobId(), attempt, JobStatus.FAILED));
+            redisStream.publishTerminal(event, startedAt, Instant.now(), JobStatus.FAILED);
         }
     }
 

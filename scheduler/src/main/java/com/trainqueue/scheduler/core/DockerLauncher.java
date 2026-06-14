@@ -1,11 +1,13 @@
 package com.trainqueue.scheduler.core;
 
 import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.api.async.ResultCallback;
 import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.command.InspectContainerResponse;
 import com.github.dockerjava.api.command.WaitContainerResultCallback;
 import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.model.Container;
+import com.github.dockerjava.api.model.Frame;
 import com.github.dockerjava.api.model.HostConfig;
 import com.github.dockerjava.api.model.WaitResponse;
 import com.trainqueue.scheduler.messaging.JobSubmittedEvent;
@@ -13,9 +15,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
 @Component
@@ -56,6 +60,34 @@ public class DockerLauncher {
                 .exec();
         docker.startContainerCmd(created.getId()).exec();
         return created.getId();
+    }
+
+    /**
+     * Follow a container's stdout, delivering one trimmed line at a time.
+     * {@code sinceEpochSecs} of 0 replays from the start; pass "now" to skip history.
+     */
+    public void streamLogs(String containerId, long sinceEpochSecs, Consumer<String> onLine) {
+        docker.logContainerCmd(containerId)
+                .withStdOut(true)
+                .withStdErr(false)
+                .withFollowStream(true)
+                .withSince((int) sinceEpochSecs)
+                .exec(new ResultCallback.Adapter<>() {
+                    private final StringBuilder buffer = new StringBuilder();
+
+                    @Override
+                    public void onNext(Frame frame) {
+                        buffer.append(new String(frame.getPayload(), StandardCharsets.UTF_8));
+                        int newline;
+                        while ((newline = buffer.indexOf("\n")) >= 0) {
+                            String line = buffer.substring(0, newline).trim();
+                            buffer.delete(0, newline + 1);
+                            if (!line.isEmpty()) {
+                                onLine.accept(line);
+                            }
+                        }
+                    }
+                });
     }
 
     /** Fire {@code onExit} once with the container's exit code when it stops. */

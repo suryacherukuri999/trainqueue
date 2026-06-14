@@ -2,6 +2,8 @@ package com.trainqueue.scheduler.core;
 
 import com.trainqueue.scheduler.messaging.JobSubmittedEvent;
 
-/** A placed job: the submission that produced it (for retry) plus its container id. */
-public record RunningContainer(JobSubmittedEvent event, String containerId) {
+import java.time.Instant;
+
+/** A placed job: the submission that produced it (for retry), its container id, and when it was placed. */
+public record RunningContainer(JobSubmittedEvent event, String containerId, Instant startedAt) {
 }

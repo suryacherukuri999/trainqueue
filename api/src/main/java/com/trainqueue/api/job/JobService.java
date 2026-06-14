@@ -3,9 +3,13 @@ package com.trainqueue.api.job;
 import com.trainqueue.api.exception.InvalidTransitionException;
 import com.trainqueue.api.exception.JobNotFoundException;
 import com.trainqueue.api.job.dto.CreateJobRequest;
+import com.trainqueue.api.job.dto.JobResponse;
 import com.trainqueue.api.messaging.CancelCommand;
 import com.trainqueue.api.messaging.JobEventPublisher;
+import com.trainqueue.api.messaging.JobStateCache;
 import com.trainqueue.api.messaging.JobSubmittedEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,14 +23,18 @@ import java.util.UUID;
 @Service
 public class JobService {
 
+    private static final Logger log = LoggerFactory.getLogger(JobService.class);
+
     private final JobRepository jobs;
     private final JobEventPublisher publisher;
+    private final JobStateCache cache;
     private final String defaultImage;
 
-    public JobService(JobRepository jobs, JobEventPublisher publisher,
+    public JobService(JobRepository jobs, JobEventPublisher publisher, JobStateCache cache,
                       @Value("${trainqueue.default-image:worker-sim:latest}") String defaultImage) {
         this.jobs = jobs;
         this.publisher = publisher;
+        this.cache = cache;
         this.defaultImage = defaultImage;
     }
 
@@ -69,6 +77,16 @@ public class JobService {
         return jobs.findById(id).orElseThrow(() -> new JobNotFoundException(id));
     }
 
+    /** Cache-aside read: serve the live Redis snapshot when present, else fall back to Postgres. */
+    public JobResponse find(UUID id) {
+        Optional<JobResponse> cached = cache.read(id);
+        if (cached.isPresent()) {
+            log.info("cache hit for job {}", id);
+            return cached.get();
+        }
+        return JobResponse.from(get(id));
+    }
+
     @Transactional
     public Job cancel(UUID id) {
         Job job = jobs.findById(id).orElseThrow(() -> new JobNotFoundException(id));
@@ -76,6 +94,8 @@ public class JobService {
             throw new InvalidTransitionException(job.getStatus(), JobStatus.CANCELLED);
         }
         job.cancel();
+        // Drop the stale cached snapshot so the next read reflects CANCELLED from Postgres.
+        cache.evict(id);
         afterCommit(() -> publisher.publishCancel(new CancelCommand(id)));
         return job;
     }

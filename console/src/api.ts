@@ -13,6 +13,10 @@ export function listJobs(): Promise<Job[]> {
   return fetch(`${BASE}/jobs`).then((r) => json<Job[]>(r));
 }
 
+export function getJob(id: string): Promise<Job> {
+  return fetch(`${BASE}/jobs/${id}`).then((r) => json<Job>(r));
+}
+
 export function createJob(req: CreateJobRequest): Promise<Job> {
   return fetch(`${BASE}/jobs`, {
     method: "POST",

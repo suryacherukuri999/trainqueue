@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { JobTable } from "./JobTable";
 import type { Job } from "../types";
 
@@ -33,6 +34,7 @@ describe("JobTable", () => {
         ]}
         onCancel={() => {}}
       />,
+      { wrapper: MemoryRouter },
     );
 
     expect(screen.getByText("alpha")).toBeInTheDocument();
@@ -51,6 +53,7 @@ describe("JobTable", () => {
         ]}
         onCancel={onCancel}
       />,
+      { wrapper: MemoryRouter },
     );
 
     const buttons = screen.getAllByRole("button", { name: "Cancel" });
@@ -62,7 +65,7 @@ describe("JobTable", () => {
   });
 
   it("shows an empty message with no jobs", () => {
-    render(<JobTable jobs={[]} onCancel={() => {}} />);
+    render(<JobTable jobs={[]} onCancel={() => {}} />, { wrapper: MemoryRouter });
     expect(screen.getByText(/no jobs yet/i)).toBeInTheDocument();
   });
 });

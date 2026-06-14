@@ -2,7 +2,8 @@
 
 Fake training run used as the job payload. Prints one JSON line per epoch
 (`jobId`, `epoch`, `loss`, `accuracy`, `ts`) with a decaying loss, sleeping 2s
-between epochs.
+between epochs. On success it writes a dummy model artifact to `/output/model.bin`,
+which the scheduler uploads to S3.
 
 ## Env
 - `JOB_ID` — id echoed into each log line (default `unknown`)

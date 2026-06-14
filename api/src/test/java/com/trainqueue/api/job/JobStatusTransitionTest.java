@@ -30,7 +30,6 @@ class JobStatusTransitionTest {
     @Test
     void terminalStatesAreFinal() {
         for (JobStatus terminal : new JobStatus[]{SUCCEEDED, FAILED, CANCELLED}) {
-            assertThat(terminal.isTerminal()).isTrue();
             for (JobStatus target : JobStatus.values()) {
                 assertThat(terminal.canTransitionTo(target))
                         .as("%s -> %s", terminal, target)

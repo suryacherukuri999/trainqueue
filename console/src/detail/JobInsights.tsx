@@ -1,0 +1,89 @@
+import { useEffect, useState } from "react";
+import { getArtifactUrl, getMetrics, searchLogs } from "../api";
+import type { LogLine, Metrics } from "../types";
+
+function toEpochMs(local: string): number | undefined {
+  if (!local) return undefined;
+  const ms = new Date(local).getTime();
+  return Number.isNaN(ms) ? undefined : ms;
+}
+
+/** Persisted metrics (Mongo), artifact download (S3), and log search (Elasticsearch). */
+export function JobInsights({ id }: { id: string }) {
+  const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [artifact, setArtifact] = useState<string | null>(null);
+
+  const [q, setQ] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [results, setResults] = useState<LogLine[] | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  function refresh() {
+    getMetrics(id).then(setMetrics).catch(() => setMetrics(null));
+    getArtifactUrl(id).then(setArtifact).catch(() => setArtifact(null));
+  }
+
+  useEffect(refresh, [id]);
+
+  async function runSearch(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      setSearchError(null);
+      setResults(await searchLogs(id, q.trim(), toEpochMs(from), toEpochMs(to)));
+    } catch (err) {
+      setSearchError(err instanceof Error ? err.message : "search failed");
+    }
+  }
+
+  return (
+    <section className="insights">
+      <h3>
+        Metrics{" "}
+        <button type="button" onClick={refresh} className="link-btn">
+          refresh
+        </button>
+      </h3>
+      {metrics ? (
+        <p className="meta">
+          final accuracy {metrics.finalAccuracy.toFixed(4)} · {metrics.epochs} epochs ·{" "}
+          {(metrics.durationMs / 1000).toFixed(1)}s ·{" "}
+          {artifact ? (
+            <a href={artifact}>download artifact</a>
+          ) : (
+            <span className="conn">no artifact</span>
+          )}
+        </p>
+      ) : (
+        <p className="conn">no recorded run yet (available after the job completes)</p>
+      )}
+
+      <h3>Log search</h3>
+      <form onSubmit={runSearch} className="submit-form">
+        <label>
+          Contains
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. epoch" />
+        </label>
+        <label>
+          From
+          <input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} />
+        </label>
+        <label>
+          To
+          <input type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} />
+        </label>
+        <button type="submit">Search</button>
+      </form>
+      {searchError && <p className="error">{searchError}</p>}
+      {results && (
+        <pre className="log">
+          {results.length === 0
+            ? "no matching log lines"
+            : results
+                .map((l) => `${new Date(l.ts).toLocaleTimeString()}  ${l.message}`)
+                .join("\n")}
+        </pre>
+      )}
+    </section>
+  );
+}

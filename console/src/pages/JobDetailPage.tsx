@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { getJob } from "../api";
 import { StatusBadge } from "../components/StatusBadge";
+import { JobInsights } from "../detail/JobInsights";
 import { useJobStream } from "../detail/useJobStream";
 import type { Job } from "../types";
 
@@ -69,6 +70,8 @@ function JobDetail({ id }: { id: string }) {
       <pre className="log">
         {state.logs.length === 0 ? "waiting for events…" : state.logs.join("\n")}
       </pre>
+
+      <JobInsights id={id} />
     </section>
   );
 }

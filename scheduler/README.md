@@ -22,6 +22,11 @@ worker-sim container, and reports status back on Kafka.
   `PUBLISH`es to Redis `job:{id}:events` (fanned out by the gateway) and `SET`s a
   cached snapshot at `job:{id}:state` (EX 1h) for the api's cache-aside read.
   Status changes go on the same channel.
+- **Persistence on completion** — `/output` is bind-mounted into the worker; on
+  success the model artifact is uploaded to `s3://trainqueue-artifacts/{jobId}/`,
+  a run document (duration, epochs, loss curve, final accuracy) is written to
+  MongoDB `trainqueue.runs`, and every log line is bulk-indexed into the
+  Elasticsearch `job-logs` index via a buffered writer (flush by count or timer).
 - **Crash recovery** — on startup it reads the api's `RUNNING` jobs and reconciles
   them against live containers: a container that survived the restart is
   re-adopted (re-attach the exit watcher); a job whose container is gone is

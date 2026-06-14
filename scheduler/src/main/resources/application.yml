@@ -5,6 +5,10 @@ spring:
     redis:
       host: localhost
       port: 6379
+    mongodb:
+      uri: mongodb://localhost:27017/trainqueue
+  elasticsearch:
+    uris: http://localhost:9200
   kafka:
     bootstrap-servers: localhost:9092
     consumer:
@@ -30,3 +34,14 @@ trainqueue:
     base-backoff-ms: 2000
     max-backoff-ms: 30000
   heartbeat-ms: 10000
+  output-dir: /tmp/trainqueue-output
+  s3:
+    endpoint: http://localhost:4566
+    region: us-east-1
+    bucket: trainqueue-artifacts
+    access-key: test
+    secret-key: test
+  es:
+    index: job-logs
+    flush-count: 50
+    flush-ms: 2000

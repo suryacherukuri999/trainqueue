@@ -36,3 +36,21 @@ export const TERMINAL: ReadonlySet<JobStatus> = new Set([
   "FAILED",
   "CANCELLED",
 ]);
+
+export interface Metrics {
+  jobId: string;
+  attempt: number;
+  durationMs: number;
+  epochs: number;
+  finalAccuracy: number;
+  lossCurve: number[];
+}
+
+export interface LogLine {
+  ts: number;
+  epoch: number | null;
+  loss: number | null;
+  accuracy: number | null;
+  level: string;
+  message: string;
+}

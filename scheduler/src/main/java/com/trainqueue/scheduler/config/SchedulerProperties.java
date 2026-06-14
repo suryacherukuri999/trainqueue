@@ -8,7 +8,10 @@ public record SchedulerProperties(
         Api api,
         Pool pool,
         Retry retry,
-        long heartbeatMs
+        long heartbeatMs,
+        String outputDir,
+        S3 s3,
+        Es es
 ) {
     public record Topics(String submitted, String status, String control) {
     }
@@ -20,5 +23,11 @@ public record SchedulerProperties(
     }
 
     public record Retry(long baseBackoffMs, long maxBackoffMs) {
+    }
+
+    public record S3(String endpoint, String region, String bucket, String accessKey, String secretKey) {
+    }
+
+    public record Es(String index, int flushCount, long flushMs) {
     }
 }

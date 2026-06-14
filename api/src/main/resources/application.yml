@@ -13,6 +13,10 @@ spring:
     redis:
       host: localhost
       port: 6379
+    mongodb:
+      uri: mongodb://localhost:27017/trainqueue
+  elasticsearch:
+    uris: http://localhost:9200
   kafka:
     bootstrap-servers: localhost:9092
     consumer:
@@ -32,3 +36,11 @@ trainqueue:
     submitted: jobs.submitted
     status: jobs.status
     control: jobs.control
+  s3:
+    endpoint: http://localhost:4566
+    region: us-east-1
+    bucket: trainqueue-artifacts
+    access-key: test
+    secret-key: test
+  es:
+    index: job-logs

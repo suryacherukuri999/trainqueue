@@ -1,6 +1,5 @@
 package com.trainqueue.scheduler.messaging;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,21 +44,10 @@ public class RedisStreamPublisher {
         publish(jobId, StreamEvent.status(jobId, JobStatus.CANCELLED, attempt));
     }
 
-    /** Parse one worker stdout line and, if it's a metric, cache + broadcast it. */
-    public void publishMetricLine(JobSubmittedEvent e, Instant startedAt, String line) {
-        try {
-            JsonNode n = mapper.readTree(line);
-            if (!n.hasNonNull("epoch")) {
-                return;
-            }
-            int epoch = n.get("epoch").asInt();
-            double loss = n.path("loss").asDouble();
-            double accuracy = n.path("accuracy").asDouble();
-            setState(JobState.of(e, JobStatus.RUNNING, startedAt, null, epoch, loss, accuracy));
-            publish(e.jobId(), StreamEvent.metric(e.jobId(), epoch, loss, accuracy));
-        } catch (Exception ex) {
-            log.debug("skipping non-metric line for {}: {}", e.jobId(), line);
-        }
+    /** Cache the latest metric in the job snapshot and broadcast it to live viewers. */
+    public void publishMetric(JobSubmittedEvent e, Instant startedAt, WorkerMetric m) {
+        setState(JobState.of(e, JobStatus.RUNNING, startedAt, null, m.epoch(), m.loss(), m.accuracy()));
+        publish(e.jobId(), StreamEvent.metric(e.jobId(), m.epoch(), m.loss(), m.accuracy()));
     }
 
     private void setState(JobState state) {

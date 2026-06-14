@@ -70,3 +70,19 @@ h1 a {
   font-size: 0.8rem;
   white-space: pre-wrap;
 }
+
+.insights {
+  margin-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 1rem;
+}
+
+.link-btn {
+  font-size: 0.75rem;
+  font-weight: 400;
+  background: none;
+  border: none;
+  color: #2563eb;
+  cursor: pointer;
+  padding: 0;
+}

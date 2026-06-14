@@ -19,6 +19,9 @@ Postgres is published on host port **5433**).
 - `GET  /api/jobs?status=` — list jobs, newest first; optional status filter.
 - `GET  /api/jobs/{id}` — one job.
 - `POST /api/jobs/{id}/cancel` — set `CANCELLED` and publish a cancel command to `jobs.control`.
+- `GET  /api/jobs/{id}/metrics` — final accuracy + loss curve for the latest attempt (MongoDB).
+- `GET  /api/jobs/{id}/artifacts` — presigned S3 URL for the model artifact (404 if none).
+- `GET  /api/jobs/{id}/logs?q=&from=&to=` — full-text log search with a time window (Elasticsearch).
 
 ## Cache-aside reads
 `GET /api/jobs/{id}` reads the scheduler-maintained `job:{id}:state` snapshot from

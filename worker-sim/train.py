@@ -36,6 +36,11 @@ def main():
 
         time.sleep(2)
 
+    # Write a dummy trained-model artifact; the scheduler uploads /output to S3.
+    os.makedirs("/output", exist_ok=True)
+    with open("/output/model.bin", "wb") as f:
+        f.write(b"trainqueue dummy model for " + job_id.encode())
+
     sys.exit(0)
 
 

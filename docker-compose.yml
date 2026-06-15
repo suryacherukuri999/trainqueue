@@ -110,6 +110,9 @@ services:
       SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/trainqueue
       SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
       TRAINQUEUE_S3_ENDPOINT: http://localstack:4566
+      # presigned artifact URLs are opened by the browser on the host, where LocalStack
+      # is published on localhost:4566 (not the in-network "localstack" hostname)
+      TRAINQUEUE_S3_PUBLIC_ENDPOINT: http://localhost:4566
       TRAINQUEUE_DEFAULT_IMAGE: worker-sim:latest
       TRAINQUEUE_API_KEY: dev-key
     depends_on:

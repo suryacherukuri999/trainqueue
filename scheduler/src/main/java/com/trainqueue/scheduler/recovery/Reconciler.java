@@ -3,6 +3,7 @@ package com.trainqueue.scheduler.recovery;
 import com.trainqueue.scheduler.core.JobLauncher;
 import com.trainqueue.scheduler.core.Scheduler;
 import com.trainqueue.scheduler.messaging.JobSubmittedEvent;
+import com.trainqueue.scheduler.messaging.StatusPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -30,11 +31,13 @@ public class Reconciler {
     private final ApiClient api;
     private final JobLauncher launcher;
     private final Scheduler scheduler;
+    private final StatusPublisher publisher;
 
-    public Reconciler(ApiClient api, JobLauncher launcher, Scheduler scheduler) {
+    public Reconciler(ApiClient api, JobLauncher launcher, Scheduler scheduler, StatusPublisher publisher) {
         this.api = api;
         this.launcher = launcher;
         this.scheduler = scheduler;
+        this.publisher = publisher;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -68,17 +71,30 @@ public class Reconciler {
             } else {
                 // worker not running, or job still QUEUED with a stale worker — reset and re-queue
                 launcher.remove(m.handle());
-                scheduler.submit(toEvent(job));
+                requeue(job);
             }
         }
 
         // 2. active jobs with no worker (lost QUEUED, or RUNNING whose worker vanished)
         for (ApiClient.JobInfo job : jobs) {
             if (job.isActive() && !managedIds.contains(job.id())) {
-                log.info("re-queueing {} ({}) with no worker", job.id(), job.status());
-                scheduler.submit(toEvent(job));
+                requeue(job);
             }
         }
+    }
+
+    /**
+     * Re-queue a job that has no worker — unless a retry for it is already scheduled in the
+     * durable outbox. Without this guard, a restart during a retry's backoff window would
+     * re-queue the job immediately AND let the backoff fire later, running it twice.
+     */
+    private void requeue(ApiClient.JobInfo job) {
+        if (publisher.hasPendingResubmit(job.id())) {
+            log.info("not re-queueing {} ({}); a retry is already scheduled", job.id(), job.status());
+            return;
+        }
+        log.info("re-queueing {} ({}) with no worker", job.id(), job.status());
+        scheduler.submit(toEvent(job));
     }
 
     private static JobSubmittedEvent toEvent(ApiClient.JobInfo j) {

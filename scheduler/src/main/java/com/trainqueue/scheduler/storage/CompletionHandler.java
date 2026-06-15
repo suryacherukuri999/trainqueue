@@ -6,13 +6,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
-import java.util.Optional;
 
 /**
- * Finalizes an attempt when it ends (success, failure, or cancel): uploads the
- * artifact if present, writes a terminal run document (with finishedAt), drains the
- * log buffer, and clears in-memory state. All best-effort so a storage hiccup never
- * breaks job completion or status reporting.
+ * Finalizes an attempt when it ends (success, failure, or cancel): on success uploads
+ * the artifact, writes a terminal run document (with finishedAt), drains the log
+ * buffer, and clears in-memory state. All best-effort so a storage hiccup never breaks
+ * job completion or status reporting.
  */
 @Component
 public class CompletionHandler {
@@ -36,15 +35,17 @@ public class CompletionHandler {
 
     /** Called once per terminal attempt (success/failure/cancel). */
     public void recordTerminal(JobSubmittedEvent event, Instant startedAt, Instant finishedAt,
-                               Optional<byte[]> artifact) {
+                               boolean succeeded) {
         es.flush(); // drain buffered log lines before snapshotting metrics
-        artifact.ifPresent(bytes -> {
+        if (succeeded) {
+            // docker: harvest model.bin from the bind mount. k8s: the worker already
+            // uploaded its own artifact, so the local dir is empty and this no-ops.
             try {
-                artifacts.uploadBytes(event.jobId(), bytes);
+                artifacts.upload(event.jobId(), event.attempt());
             } catch (Exception e) {
                 log.warn("artifact upload failed for {}: {}", event.jobId(), e.getMessage());
             }
-        });
+        }
         try {
             MetricsCollector.Snapshot snapshot = metrics.snapshot(event.jobId(), event.attempt());
             runs.save(RunDocumentMapper.completed(event, startedAt, finishedAt, snapshot));

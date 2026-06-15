@@ -52,11 +52,15 @@ public class ArtifactStore {
         return dir;
     }
 
-    /** Upload {output}/model.bin to s3://{bucket}/{jobId}/model.bin; returns the key if present. */
+    /**
+     * Upload {output}/model.bin to s3://{bucket}/{jobId}/model.bin; returns the key if present.
+     * Used by the docker path (bind mount). Under k8s the worker uploads its own artifact, so the
+     * local dir is empty and this no-ops.
+     */
     public Optional<String> upload(UUID jobId, int attempt) {
         Path file = outputDir(jobId, attempt).resolve("model.bin");
         if (!Files.exists(file)) {
-            log.warn("no artifact at {} to upload for job {}", file, jobId);
+            log.debug("no local artifact at {} for job {} (k8s worker uploads its own)", file, jobId);
             return Optional.empty();
         }
         ensureBucket();
@@ -64,14 +68,6 @@ public class ArtifactStore {
         s3.putObject(b -> b.bucket(bucket).key(key), RequestBody.fromFile(file));
         log.info("uploaded artifact for job {} to s3://{}/{}", jobId, bucket, key);
         return Optional.of(key);
-    }
-
-    /** Upload artifact bytes fetched from a worker (the Kubernetes path). */
-    public void uploadBytes(UUID jobId, byte[] bytes) {
-        ensureBucket();
-        String key = jobId + "/model.bin";
-        s3.putObject(b -> b.bucket(bucket).key(key), RequestBody.fromBytes(bytes));
-        log.info("uploaded artifact ({} bytes) for job {} to s3://{}/{}", bytes.length, jobId, bucket, key);
     }
 
     public void cleanup(UUID jobId, int attempt) {

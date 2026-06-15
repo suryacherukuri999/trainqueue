@@ -3,7 +3,6 @@ package com.trainqueue.scheduler.core;
 import com.trainqueue.scheduler.messaging.JobSubmittedEvent;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.function.IntConsumer;
 
@@ -36,15 +35,6 @@ public interface JobLauncher {
 
     /** All trainqueue worker jobs this launcher can see (for startup reconcile). */
     List<Managed> listManaged();
-
-    /**
-     * Read the model artifact from a finished worker, if this launcher fetches it that
-     * way (Kubernetes copies it from the pod before deletion). Docker uses a host bind
-     * mount instead and returns empty here. Must be called before the worker is removed.
-     */
-    default Optional<byte[]> readArtifact(String handle) {
-        return Optional.empty();
-    }
 
     record Managed(UUID jobId, String handle, boolean running) {
     }

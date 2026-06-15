@@ -24,7 +24,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -36,7 +35,7 @@ import java.util.function.IntConsumer;
  *
  * Artifacts: a completed Job's pod is terminated, so its filesystem can't be
  * exec-copied after the fact. Instead the worker uploads its own artifact to S3
- * (ARTIFACT_S3_* env below); readArtifact therefore returns empty here.
+ * (ARTIFACT_S3_* env below), so there is nothing for the scheduler to harvest.
  */
 @Component
 @ConditionalOnProperty(name = "LAUNCHER", havingValue = "k8s")
@@ -202,12 +201,6 @@ public class KubernetesLauncher implements JobLauncher {
         } catch (Exception e) {
             log.debug("delete job {} failed: {}", jobName, e.getMessage());
         }
-    }
-
-    @Override
-    public Optional<byte[]> readArtifact(String jobName) {
-        // the worker uploads its own artifact to S3 (see launch()); nothing to harvest here
-        return Optional.empty();
     }
 
     @Override

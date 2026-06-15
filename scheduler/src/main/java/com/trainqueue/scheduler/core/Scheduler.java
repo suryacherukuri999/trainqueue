@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.UUID;
@@ -287,22 +286,20 @@ public class Scheduler {
         } finally {
             lock.unlock();
         }
-        // grab the artifact (k8s copies it from the pod) before the worker is removed
-        Optional<byte[]> artifact = exitCode == 0 ? launcher.readArtifact(rc.containerId()) : Optional.empty();
         launcher.remove(rc.containerId());
         if (wasCancelled) {
             log.info("job {} was cancelled; suppressing exit (code {})", jobId, exitCode);
             // Overwrite the cached snapshot (a late metric may have re-SET it to RUNNING)
             // so cache-aside reads agree with the api's CANCELLED.
             redisStream.publishTerminal(rc.event(), rc.startedAt(), Instant.now(), JobStatus.CANCELLED);
-            completion.recordTerminal(rc.event(), rc.startedAt(), Instant.now(), Optional.empty());
+            completion.recordTerminal(rc.event(), rc.startedAt(), Instant.now(), false);
             return;
         }
         if (exitCode == 0) {
             log.info("job {} attempt {} succeeded", jobId, rc.event().attempt());
             publisher.publishStatus(JobStatusEvent.now(jobId, rc.event().attempt(), JobStatus.SUCCEEDED));
             redisStream.publishTerminal(rc.event(), rc.startedAt(), Instant.now(), JobStatus.SUCCEEDED);
-            completion.recordTerminal(rc.event(), rc.startedAt(), Instant.now(), artifact);
+            completion.recordTerminal(rc.event(), rc.startedAt(), Instant.now(), true);
         } else {
             failOrRetry(rc.event(), rc.startedAt());
         }
@@ -311,7 +308,7 @@ public class Scheduler {
     private void failOrRetry(JobSubmittedEvent event, Instant startedAt) {
         int attempt = event.attempt();
         // finalize this attempt's metrics (finishedAt set) whether or not we retry
-        completion.recordTerminal(event, startedAt, Instant.now(), Optional.empty());
+        completion.recordTerminal(event, startedAt, Instant.now(), false);
         if (retryPolicy.shouldRetry(attempt, event.maxRetries())) {
             Duration backoff = retryPolicy.backoff(attempt);
             JobSubmittedEvent next = withAttempt(event, attempt + 1);

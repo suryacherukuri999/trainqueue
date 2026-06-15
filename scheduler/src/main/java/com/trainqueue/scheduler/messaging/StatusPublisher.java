@@ -6,6 +6,7 @@ import com.trainqueue.scheduler.config.SchedulerProperties;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.UUID;
 
 /**
  * Records status events and (delayed) re-submissions in the durable scheduler outbox.
@@ -34,6 +35,14 @@ public class StatusPublisher {
     public void scheduleResubmit(JobSubmittedEvent event, Instant dueAt) {
         outbox.save(new OutboxMessage(event.eventId(), props.topics().submitted(),
                 event.jobId().toString(), toJson(event), dueAt));
+    }
+
+    /**
+     * True if a retry for this job is scheduled but not yet fired. The startup reconciler
+     * uses this so it won't also re-queue a job that the durable backoff already owns.
+     */
+    public boolean hasPendingResubmit(UUID jobId) {
+        return outbox.existsByMsgKeyAndTopicAndPublishedAtIsNull(jobId.toString(), props.topics().submitted());
     }
 
     private String toJson(Object value) {

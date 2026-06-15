@@ -96,8 +96,8 @@ run/test commands and a deeper tour of what it does.
 
 ## Tests
 ```bash
-cd api && ./mvnw test         # transitions, state machine, controller, ES query-builder
-cd scheduler && ./mvnw test   # resource pool, ordering, retry policy, run-document mapper
+cd api && ./mvnw test         # state machine, controller, ES query-builder, outbox relay (kafka-down)
+cd scheduler && ./mvnw test   # resource pool/capacity, ordering, retry policy, run-document mapper
 cd gateway && npm test        # subscription registry + fan-out
 cd console && npm test        # job table render + detail reducer
 ```

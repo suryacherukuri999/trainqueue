@@ -52,4 +52,8 @@ public class OutboxEvent {
     public String getPayload() {
         return payload;
     }
+
+    public Instant getPublishedAt() {
+        return publishedAt;
+    }
 }

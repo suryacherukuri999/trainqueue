@@ -90,6 +90,15 @@ services:
       retries: 30
 
   # --- application services (opt-in): `docker compose --profile app up --build` ---
+  # build-only helper: tags worker-sim:latest so the scheduler can launch it via the
+  # docker socket. It has no long-running role, so it just exits 0 after the build.
+  worker-sim:
+    build: ./worker-sim
+    image: worker-sim:latest
+    profiles: ["app"]
+    entrypoint: ["true"]
+    restart: "no"
+
   api:
     build: ./api
     profiles: ["app"]
@@ -123,7 +132,10 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/trainqueue-output:/tmp/trainqueue-output
-    depends_on: [api]
+    depends_on:
+      api: { condition: service_started }
+      # ensure worker-sim:latest is built before any job is launched
+      worker-sim: { condition: service_completed_successfully }
 
   gateway:
     build: ./gateway

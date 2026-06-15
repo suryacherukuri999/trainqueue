@@ -1,0 +1,24 @@
+# Lock down worker-sim pods: they serve nothing (deny all ingress) and only need
+# DNS plus the in-namespace S3 endpoint to upload their artifact (scoped egress).
+# Requires a CNI that enforces NetworkPolicy — on minikube: `minikube start --cni=calico`.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: worker-lockdown
+spec:
+  podSelector:
+    matchLabels:
+      app: trainqueue-worker
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+    # S3/LocalStack (and other services) live in this namespace
+    - to:
+        - podSelector: {}

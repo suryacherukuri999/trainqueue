@@ -45,6 +45,9 @@ services:
     environment:
       SERVICES: s3
       PERSISTENCE: "1"
+    # published so presigned artifact URLs resolve from the browser (see PUBLIC_S3_ENDPOINT)
+    ports:
+      - "4566:4566"
     volumes: [localstackdata:/var/lib/localstack]
 
   elasticsearch:
@@ -64,7 +67,8 @@ services:
       SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/trainqueue
       SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
       TRAINQUEUE_S3_ENDPOINT: http://localstack:4566
-      # presigned URLs must point at a browser-reachable host (set to your public URL / real S3)
+      # presigned URLs must point at a host the browser can reach — set PUBLIC_S3_ENDPOINT
+      # to http://<ec2-public-host>:4566 (LocalStack is published above) or your real S3
       TRAINQUEUE_S3_PUBLIC_ENDPOINT: ${PUBLIC_S3_ENDPOINT:-http://localhost:4566}
       TRAINQUEUE_DEFAULT_IMAGE: ghcr.io/suryacherukuri999/trainqueue-worker-sim:latest
       TRAINQUEUE_API_KEY: ${TRAINQUEUE_API_KEY:?set TRAINQUEUE_API_KEY}
@@ -83,10 +87,13 @@ services:
       TRAINQUEUE_API_BASE_URL: http://api:8080
       TRAINQUEUE_S3_ENDPOINT: http://localstack:4566
       TRAINQUEUE_OUTPUT_DIR: /tmp/trainqueue-output
+      # durable spool so log lines buffered for ES survive a scheduler restart
+      TRAINQUEUE_ES_SPOOL_FILE: /spool/es-spool.ndjson
     volumes:
       # launch sibling worker containers on the host daemon; share the artifact dir
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/trainqueue-output:/tmp/trainqueue-output
+      - spooldata:/spool
 
   gateway:
     image: ghcr.io/suryacherukuri999/trainqueue-gateway:latest
@@ -105,3 +112,4 @@ volumes:
   kafkadata:
   esdata:
   localstackdata:
+  spooldata:

@@ -23,7 +23,9 @@ spec:
             - { name: SPRING_DATA_MONGODB_URI, value: "mongodb://mongodb:27017/trainqueue" }
             - { name: SPRING_ELASTICSEARCH_URIS, value: "http://elasticsearch:9200" }
             - { name: TRAINQUEUE_S3_ENDPOINT, value: "http://localstack:4566" }
-            # presigned URLs must use a browser-reachable host (real S3, or your ingress)
+            # NOTE: http://localstack:4566 is cluster-internal — a browser can't resolve it,
+            # so artifact download links won't work as-is. Point this at real S3, or expose
+            # LocalStack via an ingress/NodePort and use that host here.
             - { name: TRAINQUEUE_S3_PUBLIC_ENDPOINT, value: "http://localstack:4566" }
             # the worker image jobs run as (GHCR image so the cluster can pull it)
             - { name: TRAINQUEUE_DEFAULT_IMAGE, value: "ghcr.io/suryacherukuri999/trainqueue-worker-sim:latest" }

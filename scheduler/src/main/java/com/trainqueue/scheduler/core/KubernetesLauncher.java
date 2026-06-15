@@ -1,5 +1,6 @@
 package com.trainqueue.scheduler.core;
 
+import com.trainqueue.scheduler.config.SchedulerProperties;
 import com.trainqueue.scheduler.messaging.JobSubmittedEvent;
 import io.fabric8.kubernetes.api.model.DeletionPropagation;
 import io.fabric8.kubernetes.api.model.EnvVar;
@@ -18,7 +19,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -32,8 +32,11 @@ import java.util.function.IntConsumer;
 
 /**
  * Runs worker-sim as a Kubernetes Job (backoffLimit 0, restartPolicy Never — all
- * retries stay in our scheduler). Selected with LAUNCHER=k8s. Artifacts (the
- * host /output mount) are a docker-only feature and are skipped here.
+ * retries stay in our scheduler). Selected with LAUNCHER=k8s.
+ *
+ * Artifacts: a completed Job's pod is terminated, so its filesystem can't be
+ * exec-copied after the fact. Instead the worker uploads its own artifact to S3
+ * (ARTIFACT_S3_* env below); readArtifact therefore returns empty here.
  */
 @Component
 @ConditionalOnProperty(name = "LAUNCHER", havingValue = "k8s")
@@ -43,17 +46,18 @@ public class KubernetesLauncher implements JobLauncher {
     private static final String NS = "default";
     private static final String PREFIX = "trainqueue-";
     private static final String APP_LABEL = "trainqueue-worker";
-    private static final String ARTIFACT_PATH = "/output/model.bin";
 
     private final KubernetesClient client;
+    private final SchedulerProperties.S3 s3;
     private final ExecutorService pool = Executors.newCachedThreadPool(r -> {
         Thread t = new Thread(r, "k8s-launcher");
         t.setDaemon(true);
         return t;
     });
 
-    public KubernetesLauncher(KubernetesClient client) {
+    public KubernetesLauncher(KubernetesClient client, SchedulerProperties props) {
         this.client = client;
+        this.s3 = props.s3();
     }
 
     @Override
@@ -67,6 +71,12 @@ public class KubernetesLauncher implements JobLauncher {
         if (e.failAtEpoch() != null) {
             env.add(new EnvVarBuilder().withName("FAIL_AT_EPOCH").withValue(String.valueOf(e.failAtEpoch())).build());
         }
+        // the pod is gone before we could copy its artifact, so the worker uploads its own
+        env.add(new EnvVarBuilder().withName("ARTIFACT_S3_BUCKET").withValue(s3.bucket()).build());
+        env.add(new EnvVarBuilder().withName("ARTIFACT_S3_ENDPOINT").withValue(s3.endpoint()).build());
+        env.add(new EnvVarBuilder().withName("ARTIFACT_S3_REGION").withValue(s3.region()).build());
+        env.add(new EnvVarBuilder().withName("AWS_ACCESS_KEY_ID").withValue(s3.accessKey()).build());
+        env.add(new EnvVarBuilder().withName("AWS_SECRET_ACCESS_KEY").withValue(s3.secretKey()).build());
 
         Job job = new JobBuilder()
                 .withNewMetadata()
@@ -85,6 +95,8 @@ public class KubernetesLauncher implements JobLauncher {
                                 .withImage(e.dockerImage())
                                 .withImagePullPolicy("IfNotPresent")
                                 .withEnv(env)
+                                .addNewVolumeMount().withName("output").withMountPath("/output").endVolumeMount()
+                                .addNewVolumeMount().withName("tmp").withMountPath("/tmp").endVolumeMount()
                                 .withNewResources()
                                     .addToRequests("cpu", new Quantity(e.cpuMillis() + "m"))
                                     .addToRequests("memory", new Quantity(e.memMb() + "Mi"))
@@ -93,9 +105,14 @@ public class KubernetesLauncher implements JobLauncher {
                                     .withRunAsNonRoot(true)
                                     .withRunAsUser(10001L)
                                     .withAllowPrivilegeEscalation(false)
+                                    .withReadOnlyRootFilesystem(true)
+                                    .withNewSeccompProfile().withType("RuntimeDefault").endSeccompProfile()
                                     .withNewCapabilities().withDrop("ALL").endCapabilities()
                                 .endSecurityContext()
                             .endContainer()
+                            // read-only rootfs needs writable scratch for /output and /tmp (boto3)
+                            .addNewVolume().withName("output").withNewEmptyDir().endEmptyDir().endVolume()
+                            .addNewVolume().withName("tmp").withNewEmptyDir().endEmptyDir().endVolume()
                         .endSpec()
                     .endTemplate()
                 .endSpec()
@@ -189,17 +206,8 @@ public class KubernetesLauncher implements JobLauncher {
 
     @Override
     public Optional<byte[]> readArtifact(String jobName) {
-        List<Pod> pods = client.pods().inNamespace(NS).withLabel("job-name", jobName).list().getItems();
-        if (pods.isEmpty()) {
-            return Optional.empty();
-        }
-        String pod = pods.get(0).getMetadata().getName();
-        try (InputStream in = client.pods().inNamespace(NS).withName(pod).file(ARTIFACT_PATH).read()) {
-            return Optional.of(in.readAllBytes());
-        } catch (Exception e) {
-            log.warn("artifact copy from pod {} failed: {}", pod, e.getMessage());
-            return Optional.empty();
-        }
+        // the worker uploads its own artifact to S3 (see launch()); nothing to harvest here
+        return Optional.empty();
     }
 
     @Override

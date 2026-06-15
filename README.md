@@ -62,10 +62,11 @@ Requires Docker Desktop **running** (Java 21 / Node 20 only for the dev workflow
 
 **One command — everything in containers:**
 ```bash
-docker build -t worker-sim:latest worker-sim   # the image jobs run as
-docker compose --profile app up --build        # infra + api + scheduler + gateway + console
+make app    # builds the worker image + all services, starts infra + everything (detached)
 ```
-Then open http://localhost:5173. (The dev API key is `dev-key`, baked into the console image and used by the api/scheduler.)
+Then open http://localhost:5173. (The dev API key is `dev-key`, baked into the console image and used by the api/scheduler.) `make down` stops it, `make clean` also wipes the databases.
+
+> Equivalent without `make`: `docker compose --profile app up --build` — the `worker-sim` build-helper service tags `worker-sim:latest` so the scheduler can launch it.
 
 **Or run the services on the host for development:**
 ```bash
@@ -93,6 +94,11 @@ run/test commands and a deeper tour of what it does.
 - **Kubernetes** — `LAUNCHER=k8s` runs each job as a K8s Job (fabric8). See [scheduler/README](scheduler/README.md#run-on-minikube) and [deploy/k8s/](deploy/k8s/README.md).
 - **CI** — [.github/workflows/ci.yml](.github/workflows/ci.yml): build + test all services on push/PR; push images to GHCR on `main`.
 - **Deploy** — [.github/workflows/deploy.yml](.github/workflows/deploy.yml) (manual) → EC2 via [deploy/aws/docker-compose.prod.yml](deploy/aws/docker-compose.prod.yml).
+
+## Security & honest limitations
+- **API auth is a shared key, not user auth.** The api requires an `X-API-Key`, and the console ships with it baked in (`VITE_API_KEY`). That gates service-to-service calls and casual access, but a key shipped to the browser is readable by anyone who loads the page — it is **not** real end-user authentication or multi-tenancy. A production build would put real auth in front (OIDC / a backend-for-frontend that holds the key server-side).
+- **K8s artifacts are uploaded by the worker, not copied by the scheduler.** A finished Job's pod is terminated, so its filesystem can't be copied after the fact. Under `LAUNCHER=k8s` the worker uploads its own `model.bin` to S3 (`ARTIFACT_S3_*` env). Under `LAUNCHER=docker` the worker stays network-isolated and the scheduler harvests the file from the stopped container instead.
+- **Untrusted jobs are sandboxed.** Docker workers run with `--network none`, dropped capabilities, no privilege escalation, non-root. K8s workers run non-root with a read-only rootfs, dropped capabilities, `RuntimeDefault` seccomp, and a [NetworkPolicy](deploy/k8s/networkpolicy.yaml) that denies ingress and limits egress to DNS + the in-namespace S3 endpoint (needs a NetworkPolicy-enforcing CNI, e.g. `minikube start --cni=calico`).
 
 ## Tests
 ```bash

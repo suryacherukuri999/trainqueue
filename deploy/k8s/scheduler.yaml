@@ -29,6 +29,17 @@ roleRef:
   name: scheduler-jobs
   apiGroup: rbac.authorization.k8s.io
 ---
+# durable home for the ES log spool so unflushed lines survive a scheduler restart
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: scheduler-spool
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -36,6 +47,8 @@ metadata:
   labels: { app: trainqueue, component: scheduler }
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels: { app: trainqueue, component: scheduler }
   template:
@@ -54,5 +67,11 @@ spec:
             - { name: SPRING_ELASTICSEARCH_URIS, value: "http://elasticsearch:9200" }
             - { name: TRAINQUEUE_API_BASE_URL, value: "http://api:8080" }
             - { name: TRAINQUEUE_S3_ENDPOINT, value: "http://localstack:4566" }
+            - { name: TRAINQUEUE_ES_SPOOL_FILE, value: "/spool/es-spool.ndjson" }
             - name: TRAINQUEUE_API_KEY
               valueFrom: { secretKeyRef: { name: trainqueue, key: api-key } }
+          volumeMounts:
+            - { name: spool, mountPath: /spool }
+      volumes:
+        - name: spool
+          persistentVolumeClaim: { claimName: scheduler-spool }

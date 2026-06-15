@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { cancelJob, createJob, listJobs } from "../api";
+import { cancelJob, createJob, deleteAllJobs, deleteJob, listJobs } from "../api";
 import { JobTable } from "../components/JobTable";
 import { SubmitForm } from "../components/SubmitForm";
 import type { CreateJobRequest, Job } from "../types";
@@ -43,11 +43,40 @@ export function JobsPage() {
     }
   }
 
+  async function handleDelete(id: string) {
+    try {
+      await deleteJob(id);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "failed to delete job");
+    }
+  }
+
+  async function handleDeleteAll() {
+    if (jobs.length === 0) return;
+    if (!window.confirm("Delete all jobs?")) return;
+    try {
+      await deleteAllJobs();
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "failed to delete jobs");
+    }
+  }
+
   return (
     <>
       <SubmitForm onSubmit={handleSubmit} />
       {error && <p className="error">{error}</p>}
-      <JobTable jobs={jobs} onCancel={handleCancel} />
+      <div className="table-toolbar">
+        <button
+          className="danger-button"
+          onClick={handleDeleteAll}
+          disabled={jobs.length === 0}
+        >
+          Delete all jobs
+        </button>
+      </div>
+      <JobTable jobs={jobs} onCancel={handleCancel} onDelete={handleDelete} />
     </>
   );
 }

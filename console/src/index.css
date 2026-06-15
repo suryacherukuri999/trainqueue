@@ -28,6 +28,27 @@ main {
   padding: 0.35rem 0.5rem;
 }
 
+.submit-form input::placeholder {
+  color: #9ca3af;
+  font-weight: 400;
+  opacity: 1;
+}
+
+.table-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+.row-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.danger-button {
+  color: #b91c1c;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

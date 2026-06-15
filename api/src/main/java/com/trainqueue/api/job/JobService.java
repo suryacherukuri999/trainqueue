@@ -120,6 +120,32 @@ public class JobService {
         return job;
     }
 
+    @Transactional
+    public void delete(UUID id) {
+        Job job = jobs.findById(id).orElseThrow(() -> new JobNotFoundException(id));
+        requestStopIfActive(job);
+        jobs.delete(job);
+        cache.evict(id);
+    }
+
+    @Transactional
+    public int deleteAll() {
+        List<Job> existing = jobs.findAll();
+        existing.forEach(this::requestStopIfActive);
+        jobs.deleteAllInBatch(existing);
+        existing.forEach(job -> cache.evict(job.getId()));
+        return existing.size();
+    }
+
+    private void requestStopIfActive(Job job) {
+        if (!job.getStatus().canTransitionTo(JobStatus.CANCELLED)) {
+            return;
+        }
+        UUID eventId = UUID.randomUUID();
+        outbox.save(new OutboxEvent(eventId, controlTopic, job.getId().toString(),
+                toJson(new CancelCommand(eventId, job.getId()))));
+    }
+
     private void enforceLimits(int epochs, int cpuMillis, int memMb) {
         if (epochs > maxEpochs) {
             throw new IllegalArgumentException("epochs exceeds limit " + maxEpochs);

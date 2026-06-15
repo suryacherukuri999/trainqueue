@@ -33,6 +33,7 @@ describe("JobTable", () => {
           job({ name: "beta", status: "SUCCEEDED" }),
         ]}
         onCancel={() => {}}
+        onDelete={() => {}}
       />,
       { wrapper: MemoryRouter },
     );
@@ -52,6 +53,7 @@ describe("JobTable", () => {
           job({ id: "done", name: "beta", status: "SUCCEEDED" }),
         ]}
         onCancel={onCancel}
+        onDelete={() => {}}
       />,
       { wrapper: MemoryRouter },
     );
@@ -64,8 +66,25 @@ describe("JobTable", () => {
     expect(onCancel).toHaveBeenCalledWith("live");
   });
 
+  it("fires onDelete for a row", () => {
+    const onDelete = vi.fn();
+    render(
+      <JobTable
+        jobs={[job({ id: "dead", name: "alpha", status: "FAILED" })]}
+        onCancel={() => {}}
+        onDelete={onDelete}
+      />,
+      { wrapper: MemoryRouter },
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    expect(onDelete).toHaveBeenCalledWith("dead");
+  });
+
   it("shows an empty message with no jobs", () => {
-    render(<JobTable jobs={[]} onCancel={() => {}} />, { wrapper: MemoryRouter });
+    render(<JobTable jobs={[]} onCancel={() => {}} onDelete={() => {}} />, {
+      wrapper: MemoryRouter,
+    });
     expect(screen.getByText(/no jobs yet/i)).toBeInTheDocument();
   });
 });

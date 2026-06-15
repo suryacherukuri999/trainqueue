@@ -38,6 +38,20 @@ export function cancelJob(id: string): Promise<Job> {
   return apiFetch(`/jobs/${id}/cancel`, { method: "POST" }).then((r) => json<Job>(r));
 }
 
+async function empty(res: Response): Promise<void> {
+  if (!res.ok) {
+    throw new Error(`${res.status} ${res.statusText}`);
+  }
+}
+
+export function deleteJob(id: string): Promise<void> {
+  return apiFetch(`/jobs/${id}`, { method: "DELETE" }).then(empty);
+}
+
+export function deleteAllJobs(): Promise<void> {
+  return apiFetch("/jobs", { method: "DELETE" }).then(empty);
+}
+
 export async function getMetrics(id: string): Promise<Metrics | null> {
   const res = await apiFetch(`/jobs/${id}/metrics`);
   if (res.status === 404) return null;

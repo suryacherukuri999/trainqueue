@@ -6,9 +6,10 @@ import { StatusBadge } from "./StatusBadge";
 interface Props {
   jobs: Job[];
   onCancel: (id: string) => void;
+  onDelete: (id: string) => void;
 }
 
-export function JobTable({ jobs, onCancel }: Props) {
+export function JobTable({ jobs, onCancel, onDelete }: Props) {
   if (jobs.length === 0) {
     return <p>No jobs yet. Submit one above.</p>;
   }
@@ -40,12 +41,17 @@ export function JobTable({ jobs, onCancel }: Props) {
             <td>{job.attempt}</td>
             <td>{new Date(job.createdAt).toLocaleTimeString()}</td>
             <td>
-              <button
-                onClick={() => onCancel(job.id)}
-                disabled={TERMINAL.has(job.status)}
-              >
-                Cancel
-              </button>
+              <div className="row-actions">
+                <button
+                  onClick={() => onCancel(job.id)}
+                  disabled={TERMINAL.has(job.status)}
+                >
+                  Cancel
+                </button>
+                <button className="danger-button" onClick={() => onDelete(job.id)}>
+                  Delete
+                </button>
+              </div>
             </td>
           </tr>
         ))}

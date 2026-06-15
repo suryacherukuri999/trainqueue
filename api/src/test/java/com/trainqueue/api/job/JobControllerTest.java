@@ -19,6 +19,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -94,5 +95,23 @@ class JobControllerTest {
         mvc.perform(post("/api/jobs/{id}/cancel", job.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
+
+    @Test
+    void deleteReturns204() throws Exception {
+        UUID id = UUID.randomUUID();
+
+        mvc.perform(delete("/api/jobs/{id}", id))
+                .andExpect(status().isNoContent());
+
+        verify(service).delete(id);
+    }
+
+    @Test
+    void deleteAllReturns204() throws Exception {
+        mvc.perform(delete("/api/jobs"))
+                .andExpect(status().isNoContent());
+
+        verify(service).deleteAll();
     }
 }

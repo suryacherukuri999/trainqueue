@@ -27,13 +27,22 @@ export function JobInsights({ id, status }: { id: string; status: JobStatus | nu
 
   useEffect(refresh, [id]);
 
-  // metrics/artifact only exist after completion — refresh when the job reaches a terminal state
+  // metrics/artifact appear only after completion, and the run doc can lag the status
+  // flip — so on a terminal status, poll a few times until they show up.
   useEffect(() => {
-    if (status && TERMINAL.has(status)) {
-      refresh();
-    }
+    if (!status || !TERMINAL.has(status)) return;
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      const m = await getMetrics(id).catch(() => null);
+      setMetrics(m);
+      getArtifactUrl(id).then(setArtifact).catch(() => setArtifact(null));
+      if (!m && tries++ < 5) timer = setTimeout(poll, 1000);
+    };
+    poll();
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
+  }, [status, id]);
 
   async function runSearch(e: React.FormEvent) {
     e.preventDefault();

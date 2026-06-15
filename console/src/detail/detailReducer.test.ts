@@ -50,6 +50,24 @@ describe("detailReducer", () => {
     expect(state.logs[1]).toContain("epoch 2");
   });
 
+  it("resets the curve when a retry advances the attempt", () => {
+    let state = detailReducer(initialDetail, { type: "metric", jobId: JOB, attempt: 1, epoch: 1, loss: 0.7, accuracy: 0.6, ts: "t" });
+    state = detailReducer(state, { type: "metric", jobId: JOB, attempt: 2, epoch: 1, loss: 0.9, accuracy: 0.5, ts: "t" });
+
+    expect(state.metricAttempt).toBe(2);
+    expect(state.points).toEqual([{ epoch: 1, loss: 0.9, accuracy: 0.5 }]);
+  });
+
+  it("ignores a straggler metric from an older attempt", () => {
+    let state = detailReducer(initialDetail, { type: "metric", jobId: JOB, attempt: 2, epoch: 1, loss: 0.9, accuracy: 0.5, ts: "t" });
+    const before = state;
+    state = detailReducer(state, { type: "metric", jobId: JOB, attempt: 1, epoch: 5, loss: 0.1, accuracy: 0.95, ts: "t" });
+
+    expect(state).toBe(before);
+    expect(state.metricAttempt).toBe(2);
+    expect(state.points).toEqual([{ epoch: 1, loss: 0.9, accuracy: 0.5 }]);
+  });
+
   it("keeps status and metrics independent in one timeline", () => {
     let state = detailReducer(initialDetail, status({ type: "status", jobId: JOB, status: "RUNNING", attempt: 1, ts: "t" }));
     state = detailReducer(state, { type: "metric", jobId: JOB, attempt: 1, epoch: 1, loss: 0.7, accuracy: 0.6, ts: "t" });

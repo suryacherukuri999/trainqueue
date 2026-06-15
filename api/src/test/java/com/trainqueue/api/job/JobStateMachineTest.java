@@ -88,6 +88,16 @@ class JobStateMachineTest {
     }
 
     @Test
+    void rejectsAttemptJumps() {
+        send(1, JobStatus.RUNNING);
+        send(99, JobStatus.RUNNING); // jump must be rejected (only current+1 allowed)
+        assertThat(store.get(id).getStatus()).isEqualTo(JobStatus.RUNNING);
+        assertThat(store.get(id).getAttempt()).isEqualTo(1);
+        send(1, JobStatus.SUCCEEDED); // the real success still applies
+        assertThat(store.get(id).getStatus()).isEqualTo(JobStatus.SUCCEEDED);
+    }
+
+    @Test
     void ignoresStaleAndOutOfOrderEvents() {
         send(1, JobStatus.RUNNING);
         send(1, JobStatus.SUCCEEDED);

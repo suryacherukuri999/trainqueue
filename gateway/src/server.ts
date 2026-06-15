@@ -7,17 +7,20 @@ const PORT = Number(process.env.PORT ?? 8081);
 const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
 
 const sub = new Redis(REDIS_URL);
-let redisReady = false;
-sub.on("ready", () => {
-  redisReady = true;
-});
-sub.on("error", (e) => {
-  redisReady = false;
-  console.error("redis error:", e.message);
-});
-sub.on("end", () => {
-  redisReady = false;
-});
+sub.on("error", (e) => console.error("redis error:", e.message));
+
+// dedicated client for readiness checks; fail fast (don't queue) so a paused Redis is detected
+const pinger = new Redis(REDIS_URL, { commandTimeout: 500, enableOfflineQueue: false, lazyConnect: true });
+pinger.on("error", () => undefined);
+
+async function redisHealthy(): Promise<boolean> {
+  try {
+    await pinger.ping();
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const registry = new SubscriptionRegistry({
   subscribe: (channel) => void sub.subscribe(channel),
@@ -33,10 +36,12 @@ const server = http.createServer((req, res) => {
     res.end("ok");
     return;
   }
-  // readiness: only serve traffic when Redis is connected
+  // readiness: actively PING Redis (timeout-bounded) so a paused server reads as not-ready
   if (req.url === "/readyz") {
-    res.writeHead(redisReady ? 200 : 503, { "Content-Type": "text/plain" });
-    res.end(redisReady ? "ready" : "redis unavailable");
+    redisHealthy().then((ok) => {
+      res.writeHead(ok ? 200 : 503, { "Content-Type": "text/plain" });
+      res.end(ok ? "ready" : "redis unavailable");
+    });
     return;
   }
   res.writeHead(404);
@@ -65,6 +70,7 @@ function shutdown() {
   console.log("gateway shutting down");
   wss.close();
   void sub.quit().catch(() => undefined);
+  void pinger.quit().catch(() => undefined);
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(0), 5000).unref();
 }

@@ -50,7 +50,11 @@ export function detailReducer(state: DetailState, event: StreamEvent): DetailSta
       logs: appendLog(state.logs, `status → ${event.status} (attempt ${event.attempt})`),
     };
   }
-  // metric: a retry starts a new attempt's curve, so reset points when the attempt advances
+  // ignore a straggler metric from an older attempt (out-of-order delivery)
+  if (state.metricAttempt !== null && event.attempt < state.metricAttempt) {
+    return state;
+  }
+  // a retry starts a new attempt's curve, so reset points when the attempt advances
   const fresh = state.metricAttempt !== null && event.attempt > state.metricAttempt;
   const points = fresh ? [] : state.points;
   return {

@@ -59,14 +59,15 @@ public class JobStateMachine {
             return false; // absorbing
         }
         int attempt = event.attempt();
+        int current = job.getAttempt();
         return switch (event.status()) {
-            // initial start of the current attempt, or a retry resuming on a higher attempt
-            case RUNNING -> (job.getStatus() == JobStatus.QUEUED && attempt == job.getAttempt())
-                    || (job.getStatus() == JobStatus.RUNNING && attempt > job.getAttempt());
-            // success only from RUNNING; failure also from QUEUED (unschedulable / launch failure)
-            case SUCCEEDED -> job.getStatus() == JobStatus.RUNNING && attempt >= job.getAttempt();
+            // start the current attempt, or resume on exactly the next attempt (no jumps)
+            case RUNNING -> (job.getStatus() == JobStatus.QUEUED && attempt == current)
+                    || (job.getStatus() == JobStatus.RUNNING && attempt == current + 1);
+            // terminal only for the exact running attempt; failure also from QUEUED (unschedulable)
+            case SUCCEEDED -> job.getStatus() == JobStatus.RUNNING && attempt == current;
             case FAILED -> (job.getStatus() == JobStatus.RUNNING || job.getStatus() == JobStatus.QUEUED)
-                    && attempt >= job.getAttempt();
+                    && attempt == current;
             // operator cancel (the api normally sets this itself; accept from non-terminal)
             case CANCELLED -> true;
             case QUEUED -> false;

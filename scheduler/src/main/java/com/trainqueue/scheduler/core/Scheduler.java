@@ -45,6 +45,9 @@ public class Scheduler {
             Comparator.comparingInt(JobSubmittedEvent::priority).reversed()
                     .thenComparing(JobSubmittedEvent::createdAt);
 
+    // A waiting top-of-queue job older than this holds the line so it can't be starved.
+    private static final long AGING_MS = 30_000;
+
     private final JobLauncher launcher;
     private final StatusPublisher publisher;
     private final RedisStreamPublisher redisStream;
@@ -84,8 +87,14 @@ public class Scheduler {
     @PostConstruct
     void start() {
         active = true;
+        startPlacementThread();
+    }
+
+    private void startPlacementThread() {
         placementThread = new Thread(this::placementLoop, "placement");
         placementThread.setDaemon(true);
+        placementThread.setUncaughtExceptionHandler((t, ex) ->
+                log.error("placement thread terminated abnormally: {}", ex.toString(), ex));
         placementThread.start();
     }
 
@@ -108,6 +117,13 @@ public class Scheduler {
     /** Enqueue a submitted (or re-submitted) job. */
     public void submit(JobSubmittedEvent event) {
         UUID id = event.jobId();
+        if (pool.exceedsCapacity(event.cpuMillis(), event.memMb())) {
+            log.warn("job {} requests {}m cpu / {}MB > pool capacity; marking FAILED", id,
+                    event.cpuMillis(), event.memMb());
+            publisher.publishStatus(JobStatusEvent.now(id, event.attempt(), JobStatus.FAILED));
+            redisStream.publishTerminal(event, Instant.now(), Instant.now(), JobStatus.FAILED);
+            return;
+        }
         lock.lock();
         try {
             if (cancelled.contains(id)) {
@@ -169,39 +185,70 @@ public class Scheduler {
     }
 
     private void placementLoop() {
+        while (active) {
+            JobSubmittedEvent job = null;
+            try {
+                job = takeNextPlaceable();
+                if (job == null) {
+                    continue; // woken for shutdown
+                }
+                launchAndTrack(job);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (Exception e) {
+                // A transient failure must never break scheduling (P0-3); recover and continue.
+                log.error("placement error for {}: {}", job == null ? "?" : job.jobId(), e.toString(), e);
+                if (job != null) {
+                    try {
+                        release(job);
+                        failOrRetry(job, Instant.now());
+                    } catch (Exception recovery) {
+                        log.error("recovery failed for {}: {}", job.jobId(), recovery.toString());
+                    }
+                }
+            }
+            // JVM Errors (OOM etc.) are intentionally not caught; the supervisor restarts the thread.
+        }
+    }
+
+    /** Blocks until a fitting job exists, then removes + reserves it. Returns null on shutdown. */
+    private JobSubmittedEvent takeNextPlaceable() throws InterruptedException {
         lock.lock();
         try {
             while (active) {
-                JobSubmittedEvent head = peekPlaceable();
-                if (head == null) {
-                    workAvailable.await();
-                    continue;
+                JobSubmittedEvent next = scanPlaceable();
+                if (next != null) {
+                    queue.remove(next);
+                    pool.reserve(next.cpuMillis(), next.memMb());
+                    return next;
                 }
-                queue.remove(head);
-                pool.reserve(head.cpuMillis(), head.memMb());
-                lock.unlock();
-                try {
-                    launchAndTrack(head);
-                } catch (Exception e) {
-                    log.error("failed to launch job {}: {}", head.jobId(), e.toString());
-                    release(head);
-                    failOrRetry(head, Instant.now());
-                } finally {
-                    lock.lock();
-                }
+                workAvailable.await();
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            return null;
         } finally {
             lock.unlock();
         }
     }
 
-    // Caller holds the lock. Returns the head only if it fits right now (priority head-of-line).
-    private JobSubmittedEvent peekPlaceable() {
-        JobSubmittedEvent head = queue.peek();
-        if (head != null && pool.fits(head.cpuMillis(), head.memMb())) {
-            return head;
+    // Caller holds the lock. Highest-priority job that fits now (scans past temporarily
+    // unplaceable ones), with anti-starvation: if the top job has waited too long and can
+    // eventually fit, hold the line until resources free for it.
+    private JobSubmittedEvent scanPlaceable() {
+        List<JobSubmittedEvent> sorted = queue.stream().sorted(ORDER).toList();
+        if (sorted.isEmpty()) {
+            return null;
+        }
+        JobSubmittedEvent head = sorted.get(0);
+        boolean headAged = Duration.between(head.createdAt(), Instant.now()).toMillis() > AGING_MS;
+        boolean headCanEventuallyFit = !pool.exceedsCapacity(head.cpuMillis(), head.memMb());
+        if (headAged && headCanEventuallyFit && !pool.fits(head.cpuMillis(), head.memMb())) {
+            return null;
+        }
+        for (JobSubmittedEvent job : sorted) {
+            if (pool.fits(job.cpuMillis(), job.memMb())) {
+                return job;
+            }
         }
         return null;
     }
@@ -282,6 +329,11 @@ public class Scheduler {
 
     @Scheduled(fixedDelayString = "${trainqueue.heartbeat-ms}", initialDelayString = "${trainqueue.heartbeat-ms}")
     void heartbeat() {
+        // Supervisor: if the placement thread died (e.g. a JVM Error), bring it back.
+        if (active && (placementThread == null || !placementThread.isAlive())) {
+            log.error("placement thread is not alive; restarting it");
+            startPlacementThread();
+        }
         List<Map.Entry<UUID, RunningContainer>> snapshot;
         lock.lock();
         try {

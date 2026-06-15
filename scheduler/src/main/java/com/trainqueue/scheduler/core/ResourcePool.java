@@ -22,6 +22,11 @@ public class ResourcePool {
         return cpuMillis <= availableCpuMillis && memMb <= availableMemMb;
     }
 
+    /** A job this large can never run on this pool, no matter how idle. */
+    public boolean exceedsCapacity(int cpuMillis, int memMb) {
+        return cpuMillis > totalCpuMillis || memMb > totalMemMb;
+    }
+
     public void reserve(int cpuMillis, int memMb) {
         availableCpuMillis -= cpuMillis;
         availableMemMb -= memMb;

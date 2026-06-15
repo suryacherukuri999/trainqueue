@@ -13,8 +13,9 @@ public class RetryPolicy {
         this.maxBackoffMs = maxBackoffMs;
     }
 
+    // One-based attempts: maxRetries=N means up to N retries after the first try.
     public boolean shouldRetry(int attempt, int maxRetries) {
-        return attempt < maxRetries;
+        return attempt <= maxRetries;
     }
 
     public Duration backoff(int attempt) {

@@ -28,7 +28,14 @@ public class JobStateCache {
     }
 
     public Optional<JobResponse> read(UUID id) {
-        String json = redis.opsForValue().get(key(id));
+        String json;
+        try {
+            json = redis.opsForValue().get(key(id));
+        } catch (Exception e) {
+            // Redis down/slow: treat as a miss so the caller falls back to Postgres.
+            log.warn("redis read failed for {}, falling back to db: {}", id, e.getMessage());
+            return Optional.empty();
+        }
         if (json == null) {
             return Optional.empty();
         }
@@ -41,7 +48,11 @@ public class JobStateCache {
     }
 
     public void evict(UUID id) {
-        redis.delete(key(id));
+        try {
+            redis.delete(key(id));
+        } catch (Exception e) {
+            log.warn("redis evict failed for {}: {}", id, e.getMessage());
+        }
     }
 
     private static String key(UUID id) {

@@ -10,14 +10,17 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
- * On startup, reconciles the api's RUNNING jobs against live worker containers:
- * a job whose container survived the restart is re-adopted; one whose container
- * is gone is re-queued so it runs again.
+ * On startup, reconciles desired state (the api's jobs) against actual workers:
+ * adopt valid RUNNING workers, re-queue active jobs whose worker is gone (including
+ * QUEUED jobs lost from the in-memory queue), and stop workers for cancelled,
+ * terminal, or unknown jobs.
  */
 @Component
 public class Reconciler {
@@ -36,29 +39,44 @@ public class Reconciler {
 
     @EventListener(ApplicationReadyEvent.class)
     public void reconcile() {
-        List<ApiClient.JobInfo> runningJobs;
+        List<ApiClient.JobInfo> jobs;
         try {
-            runningJobs = api.runningJobs();
+            jobs = api.allJobs();
         } catch (Exception e) {
             log.warn("startup reconcile skipped; api not reachable: {}", e.getMessage());
             return;
         }
 
-        Map<UUID, JobLauncher.Managed> managed = new HashMap<>();
-        for (JobLauncher.Managed m : launcher.listManaged()) {
-            managed.put(m.jobId(), m);
+        Map<UUID, ApiClient.JobInfo> byId = new HashMap<>();
+        for (ApiClient.JobInfo j : jobs) {
+            byId.put(j.id(), j);
         }
 
-        log.info("reconciling {} RUNNING job(s) against {} worker job(s)",
-                runningJobs.size(), managed.size());
-        for (ApiClient.JobInfo job : runningJobs) {
-            JobSubmittedEvent event = toEvent(job);
-            JobLauncher.Managed handle = managed.get(job.id());
-            if (handle != null && handle.running()) {
-                scheduler.adopt(event, handle.handle());
+        List<JobLauncher.Managed> managed = launcher.listManaged();
+        Set<UUID> managedIds = new HashSet<>();
+        log.info("reconciling {} job(s) against {} worker(s)", jobs.size(), managed.size());
+
+        // 1. every managed worker must match a RUNNING job; otherwise stop it
+        for (JobLauncher.Managed m : managed) {
+            managedIds.add(m.jobId());
+            ApiClient.JobInfo job = byId.get(m.jobId());
+            if (job == null || job.isTerminal()) {
+                log.info("stopping worker for {} (job {})", m.jobId(), job == null ? "unknown" : job.status());
+                launcher.stopAndRemove(m.handle());
+            } else if ("RUNNING".equals(job.status()) && m.running()) {
+                scheduler.adopt(toEvent(job), m.handle());
             } else {
-                log.info("job {} was RUNNING but its worker is gone; re-queueing", job.id());
-                scheduler.submit(event);
+                // worker not running, or job still QUEUED with a stale worker — reset and re-queue
+                launcher.remove(m.handle());
+                scheduler.submit(toEvent(job));
+            }
+        }
+
+        // 2. active jobs with no worker (lost QUEUED, or RUNNING whose worker vanished)
+        for (ApiClient.JobInfo job : jobs) {
+            if (job.isActive() && !managedIds.contains(job.id())) {
+                log.info("re-queueing {} ({}) with no worker", job.id(), job.status());
+                scheduler.submit(toEvent(job));
             }
         }
     }

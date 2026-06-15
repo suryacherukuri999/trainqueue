@@ -26,18 +26,28 @@ public class ApiClient {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record JobInfo(
             UUID id, String name, String dockerImage, String command, int epochs, Integer failAtEpoch,
-            int priority, int cpuMillis, int memMb, int attempt, int maxRetries, Instant createdAt) {
+            int priority, int cpuMillis, int memMb, int attempt, int maxRetries,
+            String status, Instant createdAt, Instant startedAt) {
+
+        public boolean isTerminal() {
+            return "SUCCEEDED".equals(status) || "FAILED".equals(status) || "CANCELLED".equals(status);
+        }
+
+        public boolean isActive() {
+            return "QUEUED".equals(status) || "RUNNING".equals(status);
+        }
     }
 
-    public List<JobInfo> runningJobs() {
-        String body = client.get().uri("/api/jobs?status=RUNNING").retrieve().body(String.class);
+    /** All jobs (used to reconcile desired vs actual on startup). */
+    public List<JobInfo> allJobs() {
+        String body = client.get().uri("/api/jobs").retrieve().body(String.class);
         if (body == null || body.isBlank()) {
             return List.of();
         }
         try {
             return Arrays.asList(mapper.readValue(body, JobInfo[].class));
         } catch (Exception e) {
-            throw new IllegalStateException("failed to parse running jobs", e);
+            throw new IllegalStateException("failed to parse jobs", e);
         }
     }
 }

@@ -50,12 +50,22 @@ public class RedisStreamPublisher {
         publish(e.jobId(), StreamEvent.metric(e.jobId(), m.epoch(), m.loss(), m.accuracy()));
     }
 
+    // Streaming/cache writes are best-effort: Redis is never allowed to affect
+    // authoritative execution state (a Redis outage must not fail a running job).
     private void setState(JobState state) {
-        redis.opsForValue().set("job:" + state.id() + ":state", json(state), STATE_TTL);
+        try {
+            redis.opsForValue().set("job:" + state.id() + ":state", json(state), STATE_TTL);
+        } catch (Exception e) {
+            log.warn("redis setState failed for {}: {}", state.id(), e.getMessage());
+        }
     }
 
     private void publish(UUID jobId, StreamEvent event) {
-        redis.convertAndSend("job:" + jobId + ":events", json(event));
+        try {
+            redis.convertAndSend("job:" + jobId + ":events", json(event));
+        } catch (Exception e) {
+            log.warn("redis publish failed for {}: {}", jobId, e.getMessage());
+        }
     }
 
     private String json(Object value) {

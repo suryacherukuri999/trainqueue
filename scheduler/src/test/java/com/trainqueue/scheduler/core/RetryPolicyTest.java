@@ -9,10 +9,17 @@ class RetryPolicyTest {
     private final RetryPolicy policy = new RetryPolicy(2000, 30000);
 
     @Test
-    void retriesWhileAttemptBelowMaxRetries() {
-        assertThat(policy.shouldRetry(1, 3)).isTrue();
-        assertThat(policy.shouldRetry(2, 3)).isTrue();
-        assertThat(policy.shouldRetry(3, 3)).isFalse(); // exhausted
+    void retriesUpToAndIncludingMaxRetries() {
+        // maxRetries=2 -> attempts 1,2,3 (one initial + two retries)
+        assertThat(policy.shouldRetry(1, 2)).isTrue();
+        assertThat(policy.shouldRetry(2, 2)).isTrue();
+        assertThat(policy.shouldRetry(3, 2)).isFalse(); // exhausted
+    }
+
+    @Test
+    void maxRetriesOneGivesExactlyOneRetry() {
+        assertThat(policy.shouldRetry(1, 1)).isTrue();  // the bug: was false
+        assertThat(policy.shouldRetry(2, 1)).isFalse();
     }
 
     @Test

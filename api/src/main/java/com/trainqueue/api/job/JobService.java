@@ -1,20 +1,20 @@
 package com.trainqueue.api.job;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trainqueue.api.exception.InvalidTransitionException;
 import com.trainqueue.api.exception.JobNotFoundException;
 import com.trainqueue.api.job.dto.CreateJobRequest;
 import com.trainqueue.api.job.dto.JobResponse;
 import com.trainqueue.api.messaging.CancelCommand;
-import com.trainqueue.api.messaging.JobEventPublisher;
 import com.trainqueue.api.messaging.JobStateCache;
 import com.trainqueue.api.messaging.JobSubmittedEvent;
+import com.trainqueue.api.outbox.OutboxEvent;
+import com.trainqueue.api.outbox.OutboxRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.Optional;
@@ -26,16 +26,24 @@ public class JobService {
     private static final Logger log = LoggerFactory.getLogger(JobService.class);
 
     private final JobRepository jobs;
-    private final JobEventPublisher publisher;
+    private final OutboxRepository outbox;
     private final JobStateCache cache;
+    private final ObjectMapper mapper;
     private final String defaultImage;
+    private final String submittedTopic;
+    private final String controlTopic;
 
-    public JobService(JobRepository jobs, JobEventPublisher publisher, JobStateCache cache,
-                      @Value("${trainqueue.default-image:worker-sim:latest}") String defaultImage) {
+    public JobService(JobRepository jobs, OutboxRepository outbox, JobStateCache cache, ObjectMapper mapper,
+                      @Value("${trainqueue.default-image:worker-sim:latest}") String defaultImage,
+                      @Value("${trainqueue.topics.submitted}") String submittedTopic,
+                      @Value("${trainqueue.topics.control}") String controlTopic) {
         this.jobs = jobs;
-        this.publisher = publisher;
+        this.outbox = outbox;
         this.cache = cache;
+        this.mapper = mapper;
         this.defaultImage = defaultImage;
+        this.submittedTopic = submittedTopic;
+        this.controlTopic = controlTopic;
     }
 
     @Transactional
@@ -54,14 +62,14 @@ public class JobService {
                 req.maxRetries() == null ? 0 : req.maxRetries());
         jobs.save(job);
 
-        // Publish only after commit, so the scheduler never consumes a submission
-        // for a row that isn't yet visible (and a rolled-back submit emits nothing).
-        JobSubmittedEvent event = new JobSubmittedEvent(
-                job.getId(), job.getName(), job.getDockerImage(), job.getCommand(),
-                job.getEpochs(), job.getFailAtEpoch(), job.getPriority(),
-                job.getCpuMillis(), job.getMemMb(), job.getAttempt(), job.getMaxRetries(),
-                job.getCreatedAt());
-        afterCommit(() -> publisher.publishSubmitted(event));
+        // Event goes to the outbox in the same transaction; the relay publishes it.
+        // A Kafka outage can't lose the event or hang the request.
+        UUID eventId = UUID.randomUUID();
+        JobSubmittedEvent event = new JobSubmittedEvent(eventId, job.getId(), job.getName(),
+                job.getDockerImage(), job.getCommand(), job.getEpochs(), job.getFailAtEpoch(),
+                job.getPriority(), job.getCpuMillis(), job.getMemMb(), job.getAttempt(),
+                job.getMaxRetries(), job.getCreatedAt());
+        outbox.save(new OutboxEvent(eventId, submittedTopic, job.getId().toString(), toJson(event)));
         return job;
     }
 
@@ -94,18 +102,18 @@ public class JobService {
             throw new InvalidTransitionException(job.getStatus(), JobStatus.CANCELLED);
         }
         job.cancel();
-        // Drop the stale cached snapshot so the next read reflects CANCELLED from Postgres.
+        UUID eventId = UUID.randomUUID();
+        outbox.save(new OutboxEvent(eventId, controlTopic, id.toString(),
+                toJson(new CancelCommand(eventId, id))));
         cache.evict(id);
-        afterCommit(() -> publisher.publishCancel(new CancelCommand(id)));
         return job;
     }
 
-    private void afterCommit(Runnable action) {
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                action.run();
-            }
-        });
+    private String toJson(Object value) {
+        try {
+            return mapper.writeValueAsString(value);
+        } catch (Exception e) {
+            throw new IllegalStateException("failed to serialize outbox event", e);
+        }
     }
 }

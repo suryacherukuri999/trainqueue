@@ -5,6 +5,7 @@ import java.util.UUID;
 
 /** Published to jobs.submitted; the scheduler consumes it to place and run the job. */
 public record JobSubmittedEvent(
+        UUID eventId,
         UUID jobId,
         String name,
         String dockerImage,

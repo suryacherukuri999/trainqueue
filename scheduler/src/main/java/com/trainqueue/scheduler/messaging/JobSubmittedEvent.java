@@ -7,6 +7,7 @@ import java.util.UUID;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record JobSubmittedEvent(
+        UUID eventId,
         UUID jobId,
         String name,
         String dockerImage,

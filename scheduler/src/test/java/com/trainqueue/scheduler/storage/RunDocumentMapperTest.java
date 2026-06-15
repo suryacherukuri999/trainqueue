@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RunDocumentMapperTest {
 
     private JobSubmittedEvent event(UUID id, int attempt) {
-        return new JobSubmittedEvent(id, "demo", "worker-sim:latest", null, 3, null,
+        return new JobSubmittedEvent(UUID.randomUUID(), id, "demo", "worker-sim:latest", null, 3, null,
                 1, 1000, 1024, attempt, 2, Instant.parse("2026-01-01T00:00:00Z"));
     }
 

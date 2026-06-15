@@ -64,7 +64,8 @@ public class Reconciler {
     }
 
     private static JobSubmittedEvent toEvent(ApiClient.JobInfo j) {
-        return new JobSubmittedEvent(j.id(), j.name(), j.dockerImage(), j.command(), j.epochs(),
-                j.failAtEpoch(), j.priority(), j.cpuMillis(), j.memMb(), j.attempt(), j.maxRetries(), j.createdAt());
+        return new JobSubmittedEvent(UUID.randomUUID(), j.id(), j.name(), j.dockerImage(), j.command(),
+                j.epochs(), j.failAtEpoch(), j.priority(), j.cpuMillis(), j.memMb(), j.attempt(),
+                j.maxRetries(), j.createdAt());
     }
 }

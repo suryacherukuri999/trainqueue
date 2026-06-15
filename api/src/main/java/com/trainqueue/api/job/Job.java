@@ -6,6 +6,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -16,6 +17,9 @@ public class Job {
 
     @Id
     private UUID id;
+
+    @Version
+    private long version;
 
     private String name;
     private String dockerImage;
@@ -59,6 +63,7 @@ public class Job {
     public void markRunning(int attempt) {
         this.status = JobStatus.RUNNING;
         this.attempt = attempt;
+        this.finishedAt = null; // invariant: a running job has no finish time
         if (this.startedAt == null) {
             this.startedAt = Instant.now();
         }

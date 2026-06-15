@@ -22,11 +22,15 @@ public class JobStatusListener {
 
     @KafkaListener(topics = "${trainqueue.topics.status}", groupId = "api")
     public void onStatus(String payload) {
+        JobStatusEvent event;
         try {
-            stateMachine.apply(mapper.readValue(payload, JobStatusEvent.class));
+            event = mapper.readValue(payload, JobStatusEvent.class);
         } catch (Exception e) {
-            // Bad payloads must not stall the partition; log and move on.
-            log.error("failed to handle status event: {}", payload, e);
+            // Poison payload: skip so it doesn't stall the partition.
+            log.error("skipping unparseable status event: {}", payload, e);
+            return;
         }
+        // Let transient failures propagate so the container retries (offset not committed).
+        stateMachine.apply(event);
     }
 }

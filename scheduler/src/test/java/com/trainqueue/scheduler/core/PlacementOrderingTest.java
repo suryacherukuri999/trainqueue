@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PlacementOrderingTest {
 
     private static JobSubmittedEvent job(String name, int priority, Instant createdAt) {
-        return new JobSubmittedEvent(UUID.randomUUID(), name, "worker-sim:latest", null,
+        return new JobSubmittedEvent(UUID.randomUUID(), UUID.randomUUID(), name, "worker-sim:latest", null,
                 5, null, priority, 1000, 1024, 1, 0, createdAt);
     }
 

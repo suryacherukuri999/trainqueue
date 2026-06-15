@@ -312,7 +312,8 @@ public class Scheduler {
     }
 
     private static JobSubmittedEvent withAttempt(JobSubmittedEvent e, int attempt) {
-        return new JobSubmittedEvent(e.jobId(), e.name(), e.dockerImage(), e.command(), e.epochs(),
-                e.failAtEpoch(), e.priority(), e.cpuMillis(), e.memMb(), attempt, e.maxRetries(), e.createdAt());
+        return new JobSubmittedEvent(UUID.randomUUID(), e.jobId(), e.name(), e.dockerImage(), e.command(),
+                e.epochs(), e.failAtEpoch(), e.priority(), e.cpuMillis(), e.memMb(), attempt,
+                e.maxRetries(), e.createdAt());
     }
 }

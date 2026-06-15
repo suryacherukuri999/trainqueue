@@ -11,22 +11,31 @@ import org.springframework.stereotype.Component;
 public class ControlListener {
 
     private static final Logger log = LoggerFactory.getLogger(ControlListener.class);
+    private static final String CONSUMER = "scheduler-control";
 
     private final ObjectMapper mapper;
     private final Scheduler scheduler;
+    private final ConsumerInbox inbox;
 
-    public ControlListener(ObjectMapper mapper, Scheduler scheduler) {
+    public ControlListener(ObjectMapper mapper, Scheduler scheduler, ConsumerInbox inbox) {
         this.mapper = mapper;
         this.scheduler = scheduler;
+        this.inbox = inbox;
     }
 
     @KafkaListener(topics = "${trainqueue.topics.control}", groupId = "scheduler")
     public void onControl(String payload) {
+        CancelCommand command;
         try {
-            CancelCommand command = mapper.readValue(payload, CancelCommand.class);
-            scheduler.cancel(command.jobId());
+            command = mapper.readValue(payload, CancelCommand.class);
         } catch (Exception e) {
-            log.error("failed to handle control command: {}", payload, e);
+            log.error("skipping unparseable control command: {}", payload, e);
+            return;
         }
+        if (!inbox.firstSeen(CONSUMER, command.eventId())) {
+            log.debug("duplicate control command {} ignored", command.eventId());
+            return;
+        }
+        scheduler.cancel(command.jobId());
     }
 }

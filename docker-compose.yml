@@ -25,11 +25,15 @@ services:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      # api/scheduler run on the host, so advertise the host-reachable address
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      # two broker listeners with different advertised hosts: containers (the `app`
+      # profile) reach the broker at kafka:29092 over the docker network, host processes
+      # (the dev workflow) reach it at localhost:9092 via the published port. A single
+      # localhost-advertised listener would redirect in-network clients back to themselves.
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      # inter-broker traffic uses the internal listener (kafka:29092 resolves in-network)
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
@@ -105,7 +109,7 @@ services:
     ports: ["8080:8080"]
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/trainqueue
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/trainqueue
       SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
@@ -124,7 +128,7 @@ services:
     profiles: ["app"]
     environment:
       LAUNCHER: docker
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/trainqueue
       SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200

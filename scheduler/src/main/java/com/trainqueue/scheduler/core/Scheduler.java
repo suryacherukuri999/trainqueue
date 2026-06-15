@@ -30,9 +30,6 @@ import java.util.Optional;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -62,13 +59,11 @@ public class Scheduler {
     private final Condition workAvailable = lock.newCondition();
     private final PriorityQueue<JobSubmittedEvent> queue = new PriorityQueue<>(ORDER);
     private final Map<UUID, RunningContainer> running = new HashMap<>();
+    // jobs pulled from the queue but not yet in `running` (the launch is in flight);
+    // tracked so a concurrent submit/reconcile can't double-launch the same job.
+    private final Set<UUID> launching = new HashSet<>();
     private final Set<UUID> cancelled = new HashSet<>();
 
-    private final ScheduledExecutorService retryExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
-        Thread t = new Thread(r, "retry");
-        t.setDaemon(true);
-        return t;
-    });
     private volatile boolean active;
     private Thread placementThread;
 
@@ -112,7 +107,6 @@ public class Scheduler {
         if (placementThread != null) {
             placementThread.interrupt();
         }
-        retryExecutor.shutdownNow();
     }
 
     /** Enqueue a submitted (or re-submitted) job. */
@@ -131,7 +125,7 @@ public class Scheduler {
                 log.info("ignoring submit for cancelled job {}", id);
                 return;
             }
-            if (running.containsKey(id) || queueContains(id)) {
+            if (running.containsKey(id) || launching.contains(id) || queueContains(id)) {
                 log.info("ignoring duplicate submit for job {}", id);
                 return;
             }
@@ -222,6 +216,7 @@ public class Scheduler {
                 if (next != null) {
                     queue.remove(next);
                     pool.reserve(next.cpuMillis(), next.memMb());
+                    launching.add(next.jobId()); // claimed but not yet in `running`
                     return next;
                 }
                 workAvailable.await();
@@ -262,6 +257,7 @@ public class Scheduler {
         lock.lock();
         try {
             running.put(event.jobId(), new RunningContainer(event, containerId, startedAt, outputDir.toString()));
+            launching.remove(event.jobId());
             cancelledDuringLaunch = cancelled.contains(event.jobId());
         } finally {
             lock.unlock();
@@ -299,14 +295,14 @@ public class Scheduler {
             // Overwrite the cached snapshot (a late metric may have re-SET it to RUNNING)
             // so cache-aside reads agree with the api's CANCELLED.
             redisStream.publishTerminal(rc.event(), rc.startedAt(), Instant.now(), JobStatus.CANCELLED);
-            completion.onTerminal(rc.event());
+            completion.recordTerminal(rc.event(), rc.startedAt(), Instant.now(), Optional.empty());
             return;
         }
         if (exitCode == 0) {
             log.info("job {} attempt {} succeeded", jobId, rc.event().attempt());
             publisher.publishStatus(JobStatusEvent.now(jobId, rc.event().attempt(), JobStatus.SUCCEEDED));
             redisStream.publishTerminal(rc.event(), rc.startedAt(), Instant.now(), JobStatus.SUCCEEDED);
-            completion.onSuccess(rc.event(), rc.startedAt(), Instant.now(), artifact);
+            completion.recordTerminal(rc.event(), rc.startedAt(), Instant.now(), artifact);
         } else {
             failOrRetry(rc.event(), rc.startedAt());
         }
@@ -314,20 +310,19 @@ public class Scheduler {
 
     private void failOrRetry(JobSubmittedEvent event, Instant startedAt) {
         int attempt = event.attempt();
+        // finalize this attempt's metrics (finishedAt set) whether or not we retry
+        completion.recordTerminal(event, startedAt, Instant.now(), Optional.empty());
         if (retryPolicy.shouldRetry(attempt, event.maxRetries())) {
             Duration backoff = retryPolicy.backoff(attempt);
             JobSubmittedEvent next = withAttempt(event, attempt + 1);
             log.info("job {} attempt {} failed; retrying as attempt {} in {}ms",
                     event.jobId(), attempt, attempt + 1, backoff.toMillis());
-            retryExecutor.schedule(() -> publisher.republishSubmitted(next),
-                    backoff.toMillis(), TimeUnit.MILLISECONDS);
+            publisher.scheduleResubmit(next, Instant.now().plus(backoff)); // durable, restart-safe
         } else {
             log.info("job {} attempt {} failed; no retries left -> FAILED", event.jobId(), attempt);
             publisher.publishStatus(JobStatusEvent.now(event.jobId(), attempt, JobStatus.FAILED));
             redisStream.publishTerminal(event, startedAt, Instant.now(), JobStatus.FAILED);
         }
-        // clean up this attempt's metrics/output whether we retry or give up
-        completion.onTerminal(event);
     }
 
     @Scheduled(fixedDelayString = "${trainqueue.heartbeat-ms}", initialDelayString = "${trainqueue.heartbeat-ms}")
@@ -356,6 +351,7 @@ public class Scheduler {
         lock.lock();
         try {
             pool.release(event.cpuMillis(), event.memMb());
+            launching.remove(event.jobId());
             workAvailable.signalAll();
         } finally {
             lock.unlock();

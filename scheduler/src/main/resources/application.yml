@@ -5,6 +5,9 @@ spring:
     redis:
       host: localhost
       port: 6379
+      # best-effort streaming writes must not block the log thread on a slow Redis
+      timeout: 250ms
+      connect-timeout: 250ms
     mongodb:
       uri: mongodb://localhost:27017/trainqueue
   elasticsearch:
@@ -14,11 +17,15 @@ spring:
     consumer:
       group-id: scheduler
       auto-offset-reset: earliest
+      enable-auto-commit: false
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    listener:
+      # ack only after the action + inbox marker are persisted (idempotent consumers)
+      ack-mode: MANUAL
 
 trainqueue:
   topics:

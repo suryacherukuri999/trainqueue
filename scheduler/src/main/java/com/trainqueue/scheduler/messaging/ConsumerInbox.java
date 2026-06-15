@@ -15,17 +15,17 @@ public class ConsumerInbox {
         this.repo = repo;
     }
 
-    /** True if this (consumer, eventId) was not seen before (and is now recorded). */
-    public boolean firstSeen(String consumer, UUID eventId) {
-        String id = consumer + ":" + eventId;
-        if (repo.existsById(id)) {
-            return false;
-        }
+    public boolean alreadyProcessed(String consumer, UUID eventId) {
+        return repo.existsById(consumer + ":" + eventId);
+    }
+
+    /** Record after the action succeeds (and before acking Kafka), so we never mark
+     *  an event done without having done it. */
+    public void markProcessed(String consumer, UUID eventId) {
         try {
             repo.insert(new InboxRecord(consumer, eventId));
-            return true;
-        } catch (DuplicateKeyException e) {
-            return false; // lost a race; another delivery already recorded it
+        } catch (DuplicateKeyException ignored) {
+            // already recorded by a concurrent/redelivered copy
         }
     }
 }

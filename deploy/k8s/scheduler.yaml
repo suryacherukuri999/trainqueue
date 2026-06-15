@@ -54,3 +54,5 @@ spec:
             - { name: SPRING_ELASTICSEARCH_URIS, value: "http://elasticsearch:9200" }
             - { name: TRAINQUEUE_API_BASE_URL, value: "http://api:8080" }
             - { name: TRAINQUEUE_S3_ENDPOINT, value: "http://localstack:4566" }
+            - name: TRAINQUEUE_API_KEY
+              valueFrom: { secretKeyRef: { name: trainqueue, key: api-key } }

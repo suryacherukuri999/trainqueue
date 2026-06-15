@@ -58,11 +58,19 @@ applied by an idempotent state machine.
 - [console/](console/README.md) — Vite + React + TS dashboard: live job detail page + metrics, artifact, log search.
 
 ## Quickstart
-Requires Docker Desktop **running**, Java 21, Node 20+, and Maven.
+Requires Docker Desktop **running** (Java 21 / Node 20 only for the dev workflow below).
 
+**One command — everything in containers:**
 ```bash
-docker compose up -d                          # infra: postgres(5433) kafka redis mongo localstack/s3 elasticsearch
-docker build -t worker-sim:latest worker-sim  # the image the scheduler runs
+docker build -t worker-sim:latest worker-sim   # the image jobs run as
+docker compose --profile app up --build        # infra + api + scheduler + gateway + console
+```
+Then open http://localhost:5173. (The dev API key is `dev-key`, baked into the console image and used by the api/scheduler.)
+
+**Or run the services on the host for development:**
+```bash
+docker compose up -d                          # infra only: postgres(5433) kafka redis mongo localstack/s3 elasticsearch
+docker build -t worker-sim:latest worker-sim
 
 cd api       && ./mvnw spring-boot:run        # :8080   (terminal 1)
 cd scheduler && ./mvnw spring-boot:run        #         (terminal 2)
@@ -70,7 +78,7 @@ cd gateway   && npm install && npm run dev    # :8081   (terminal 3)
 cd console   && npm install && npm run dev    # :5173   (terminal 4)
 ```
 
-Open http://localhost:5173, submit a job, and click its name for the live detail
+Submit a job and click its name for the live detail
 page (status, streaming logs, loss curve). After it finishes, use the metrics,
 artifact download, and log-search controls. Each service README has its own
 run/test commands and a deeper tour of what it does.

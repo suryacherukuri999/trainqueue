@@ -1,19 +1,12 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { getJob } from "../api";
 import { StatusBadge } from "../components/StatusBadge";
 import { JobInsights } from "../detail/JobInsights";
 import { useJobStream } from "../detail/useJobStream";
 import type { Job } from "../types";
+
+const LossChart = lazy(() => import("../detail/LossChart"));
 
 export function JobDetailPage() {
   const { id } = useParams();
@@ -54,24 +47,16 @@ function JobDetail({ id }: { id: string }) {
       )}
 
       <h3>Loss</h3>
-      <div style={{ width: "100%", height: 260 }}>
-        <ResponsiveContainer>
-          <LineChart data={state.points}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="epoch" />
-            <YAxis domain={[0, "auto"]} />
-            <Tooltip />
-            <Line type="monotone" dataKey="loss" stroke="#2563eb" dot={false} isAnimationActive />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+      <Suspense fallback={<p className="conn">loading chart…</p>}>
+        <LossChart points={state.points} />
+      </Suspense>
 
       <h3>Live log</h3>
       <pre className="log">
         {state.logs.length === 0 ? "waiting for events…" : state.logs.join("\n")}
       </pre>
 
-      <JobInsights id={id} />
+      <JobInsights id={id} status={status} />
     </section>
   );
 }

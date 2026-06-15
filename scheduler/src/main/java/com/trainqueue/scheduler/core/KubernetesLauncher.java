@@ -18,11 +18,13 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -41,6 +43,7 @@ public class KubernetesLauncher implements JobLauncher {
     private static final String NS = "default";
     private static final String PREFIX = "trainqueue-";
     private static final String APP_LABEL = "trainqueue-worker";
+    private static final String ARTIFACT_PATH = "/output/model.bin";
 
     private final KubernetesClient client;
     private final ExecutorService pool = Executors.newCachedThreadPool(r -> {
@@ -181,6 +184,21 @@ public class KubernetesLauncher implements JobLauncher {
                     .withPropagationPolicy(DeletionPropagation.BACKGROUND).delete();
         } catch (Exception e) {
             log.debug("delete job {} failed: {}", jobName, e.getMessage());
+        }
+    }
+
+    @Override
+    public Optional<byte[]> readArtifact(String jobName) {
+        List<Pod> pods = client.pods().inNamespace(NS).withLabel("job-name", jobName).list().getItems();
+        if (pods.isEmpty()) {
+            return Optional.empty();
+        }
+        String pod = pods.get(0).getMetadata().getName();
+        try (InputStream in = client.pods().inNamespace(NS).withName(pod).file(ARTIFACT_PATH).read()) {
+            return Optional.of(in.readAllBytes());
+        } catch (Exception e) {
+            log.warn("artifact copy from pod {} failed: {}", pod, e.getMessage());
+            return Optional.empty();
         }
     }
 

@@ -66,6 +66,14 @@ public class ArtifactStore {
         return Optional.of(key);
     }
 
+    /** Upload artifact bytes fetched from a worker (the Kubernetes path). */
+    public void uploadBytes(UUID jobId, byte[] bytes) {
+        ensureBucket();
+        String key = jobId + "/model.bin";
+        s3.putObject(b -> b.bucket(bucket).key(key), RequestBody.fromBytes(bytes));
+        log.info("uploaded artifact ({} bytes) for job {} to s3://{}/{}", bytes.length, jobId, bucket, key);
+    }
+
     public void cleanup(UUID jobId, int attempt) {
         Path dir = outputDir(jobId, attempt);
         if (!Files.exists(dir)) {

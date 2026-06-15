@@ -47,7 +47,7 @@ public class RedisStreamPublisher {
     /** Cache the latest metric in the job snapshot and broadcast it to live viewers. */
     public void publishMetric(JobSubmittedEvent e, Instant startedAt, WorkerMetric m) {
         setState(JobState.of(e, JobStatus.RUNNING, startedAt, null, m.epoch(), m.loss(), m.accuracy()));
-        publish(e.jobId(), StreamEvent.metric(e.jobId(), m.epoch(), m.loss(), m.accuracy()));
+        publish(e.jobId(), StreamEvent.metric(e.jobId(), e.attempt(), m.epoch(), m.loss(), m.accuracy()));
     }
 
     // Streaming/cache writes are best-effort: Redis is never allowed to affect

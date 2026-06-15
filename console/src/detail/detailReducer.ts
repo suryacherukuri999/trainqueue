@@ -5,6 +5,7 @@ export type StreamEvent =
   | {
       type: "metric";
       jobId: string;
+      attempt: number;
       epoch: number;
       loss: number;
       accuracy: number;
@@ -20,6 +21,7 @@ export interface MetricPoint {
 export interface DetailState {
   status: JobStatus | null;
   attempt: number | null;
+  metricAttempt: number | null;
   points: MetricPoint[];
   logs: string[];
 }
@@ -27,6 +29,7 @@ export interface DetailState {
 export const initialDetail: DetailState = {
   status: null,
   attempt: null,
+  metricAttempt: null,
   points: [],
   logs: [],
 };
@@ -47,9 +50,13 @@ export function detailReducer(state: DetailState, event: StreamEvent): DetailSta
       logs: appendLog(state.logs, `status → ${event.status} (attempt ${event.attempt})`),
     };
   }
+  // metric: a retry starts a new attempt's curve, so reset points when the attempt advances
+  const fresh = state.metricAttempt !== null && event.attempt > state.metricAttempt;
+  const points = fresh ? [] : state.points;
   return {
     ...state,
-    points: [...state.points, { epoch: event.epoch, loss: event.loss, accuracy: event.accuracy }],
+    metricAttempt: event.attempt,
+    points: [...points, { epoch: event.epoch, loss: event.loss, accuracy: event.accuracy }],
     logs: appendLog(
       state.logs,
       `epoch ${event.epoch}  loss ${event.loss.toFixed(4)}  acc ${event.accuracy.toFixed(4)}`,

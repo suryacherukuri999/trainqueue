@@ -42,10 +42,11 @@ trainqueue:
     status: jobs.status
     control: jobs.control
   s3:
-    endpoint: http://localhost:4566
+    endpoint: ${TRAINQUEUE_S3_ENDPOINT:http://localhost:4566}
+    public-endpoint: ${TRAINQUEUE_S3_PUBLIC_ENDPOINT:}
     region: us-east-1
     bucket: trainqueue-artifacts
-    access-key: test
-    secret-key: test
+    access-key: ${AWS_ACCESS_KEY_ID:test}
+    secret-key: ${AWS_SECRET_ACCESS_KEY:test}
   es:
     index: job-logs

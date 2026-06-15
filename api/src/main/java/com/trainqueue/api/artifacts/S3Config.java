@@ -28,8 +28,9 @@ public class S3Config {
 
     @Bean
     S3Presigner s3Presigner(S3Properties p) {
+        // presign against the public endpoint so the URL host is reachable by the browser
         return S3Presigner.builder()
-                .endpointOverride(URI.create(p.endpoint()))
+                .endpointOverride(URI.create(p.publicEndpointOrDefault()))
                 .region(Region.of(p.region()))
                 .credentialsProvider(creds(p))
                 .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())

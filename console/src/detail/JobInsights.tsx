@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getArtifactUrl, getMetrics, searchLogs } from "../api";
-import type { LogLine, Metrics } from "../types";
+import { TERMINAL } from "../types";
+import type { JobStatus, LogLine, Metrics } from "../types";
 
 function toEpochMs(local: string): number | undefined {
   if (!local) return undefined;
@@ -9,7 +10,7 @@ function toEpochMs(local: string): number | undefined {
 }
 
 /** Persisted metrics (Mongo), artifact download (S3), and log search (Elasticsearch). */
-export function JobInsights({ id }: { id: string }) {
+export function JobInsights({ id, status }: { id: string; status: JobStatus | null }) {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [artifact, setArtifact] = useState<string | null>(null);
 
@@ -25,6 +26,14 @@ export function JobInsights({ id }: { id: string }) {
   }
 
   useEffect(refresh, [id]);
+
+  // metrics/artifact only exist after completion — refresh when the job reaches a terminal state
+  useEffect(() => {
+    if (status && TERMINAL.has(status)) {
+      refresh();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
 
   async function runSearch(e: React.FormEvent) {
     e.preventDefault();

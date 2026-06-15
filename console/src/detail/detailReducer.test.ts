@@ -26,6 +26,7 @@ describe("detailReducer", () => {
     let state = detailReducer(initialDetail, {
       type: "metric",
       jobId: JOB,
+      attempt: 1,
       epoch: 1,
       loss: 0.7,
       accuracy: 0.6,
@@ -34,6 +35,7 @@ describe("detailReducer", () => {
     state = detailReducer(state, {
       type: "metric",
       jobId: JOB,
+      attempt: 1,
       epoch: 2,
       loss: 0.5,
       accuracy: 0.75,
@@ -50,7 +52,7 @@ describe("detailReducer", () => {
 
   it("keeps status and metrics independent in one timeline", () => {
     let state = detailReducer(initialDetail, status({ type: "status", jobId: JOB, status: "RUNNING", attempt: 1, ts: "t" }));
-    state = detailReducer(state, { type: "metric", jobId: JOB, epoch: 1, loss: 0.7, accuracy: 0.6, ts: "t" });
+    state = detailReducer(state, { type: "metric", jobId: JOB, attempt: 1, epoch: 1, loss: 0.7, accuracy: 0.6, ts: "t" });
     state = detailReducer(state, status({ type: "status", jobId: JOB, status: "SUCCEEDED", attempt: 1, ts: "t" }));
 
     expect(state.status).toBe("SUCCEEDED");

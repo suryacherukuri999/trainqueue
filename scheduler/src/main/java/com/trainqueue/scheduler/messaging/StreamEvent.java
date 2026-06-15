@@ -18,7 +18,7 @@ public record StreamEvent(
         return new StreamEvent("status", jobId, status, attempt, null, null, null, Instant.now());
     }
 
-    public static StreamEvent metric(UUID jobId, int epoch, double loss, double accuracy) {
-        return new StreamEvent("metric", jobId, null, null, epoch, loss, accuracy, Instant.now());
+    public static StreamEvent metric(UUID jobId, int attempt, int epoch, double loss, double accuracy) {
+        return new StreamEvent("metric", jobId, null, attempt, epoch, loss, accuracy, Instant.now());
     }
 }

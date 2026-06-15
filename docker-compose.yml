@@ -89,6 +89,59 @@ services:
       timeout: 5s
       retries: 30
 
+  # --- application services (opt-in): `docker compose --profile app up --build` ---
+  api:
+    build: ./api
+    profiles: ["app"]
+    ports: ["8080:8080"]
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/trainqueue
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/trainqueue
+      SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
+      TRAINQUEUE_S3_ENDPOINT: http://localstack:4566
+      TRAINQUEUE_DEFAULT_IMAGE: worker-sim:latest
+      TRAINQUEUE_API_KEY: dev-key
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+
+  scheduler:
+    build: ./scheduler
+    profiles: ["app"]
+    environment:
+      LAUNCHER: docker
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/trainqueue
+      SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
+      TRAINQUEUE_API_BASE_URL: http://api:8080
+      TRAINQUEUE_API_KEY: dev-key
+      TRAINQUEUE_S3_ENDPOINT: http://localstack:4566
+      TRAINQUEUE_OUTPUT_DIR: /tmp/trainqueue-output
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/trainqueue-output:/tmp/trainqueue-output
+    depends_on: [api]
+
+  gateway:
+    build: ./gateway
+    profiles: ["app"]
+    ports: ["8081:8081"]
+    environment:
+      REDIS_URL: redis://redis:6379
+
+  console:
+    build:
+      context: ./console
+      args:
+        # baked-in at build; matches the api/scheduler dev key
+        VITE_API_KEY: dev-key
+    profiles: ["app"]
+    ports: ["5173:80"]
+    depends_on: [api, gateway]
+
 volumes:
   pgdata:
   mongodata:

@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.UUID;
@@ -290,6 +291,8 @@ public class Scheduler {
         } finally {
             lock.unlock();
         }
+        // grab the artifact (k8s copies it from the pod) before the worker is removed
+        Optional<byte[]> artifact = exitCode == 0 ? launcher.readArtifact(rc.containerId()) : Optional.empty();
         launcher.remove(rc.containerId());
         if (wasCancelled) {
             log.info("job {} was cancelled; suppressing exit (code {})", jobId, exitCode);
@@ -303,7 +306,7 @@ public class Scheduler {
             log.info("job {} attempt {} succeeded", jobId, rc.event().attempt());
             publisher.publishStatus(JobStatusEvent.now(jobId, rc.event().attempt(), JobStatus.SUCCEEDED));
             redisStream.publishTerminal(rc.event(), rc.startedAt(), Instant.now(), JobStatus.SUCCEEDED);
-            completion.onSuccess(rc.event(), rc.startedAt(), Instant.now());
+            completion.onSuccess(rc.event(), rc.startedAt(), Instant.now(), artifact);
         } else {
             failOrRetry(rc.event(), rc.startedAt());
         }

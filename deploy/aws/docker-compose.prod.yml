@@ -30,6 +30,8 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes: [kafkadata:/var/lib/kafka/data]
 
   redis:
     image: redis:7
@@ -42,6 +44,8 @@ services:
     image: localstack/localstack:3
     environment:
       SERVICES: s3
+      PERSISTENCE: "1"
+    volumes: [localstackdata:/var/lib/localstack]
 
   elasticsearch:
     image: elasticsearch:8.13.4
@@ -49,6 +53,7 @@ services:
       discovery.type: single-node
       xpack.security.enabled: "false"
       ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes: [esdata:/usr/share/elasticsearch/data]
 
   api:
     image: ghcr.io/suryacherukuri999/trainqueue-api:latest
@@ -59,7 +64,10 @@ services:
       SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/trainqueue
       SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
       TRAINQUEUE_S3_ENDPOINT: http://localstack:4566
+      # presigned URLs must point at a browser-reachable host (set to your public URL / real S3)
+      TRAINQUEUE_S3_PUBLIC_ENDPOINT: ${PUBLIC_S3_ENDPOINT:-http://localhost:4566}
       TRAINQUEUE_DEFAULT_IMAGE: ghcr.io/suryacherukuri999/trainqueue-worker-sim:latest
+      TRAINQUEUE_API_KEY: ${TRAINQUEUE_API_KEY:?set TRAINQUEUE_API_KEY}
     depends_on:
       postgres: { condition: service_healthy }
 
@@ -67,6 +75,7 @@ services:
     image: ghcr.io/suryacherukuri999/trainqueue-scheduler:latest
     environment:
       LAUNCHER: docker
+      TRAINQUEUE_API_KEY: ${TRAINQUEUE_API_KEY:?set TRAINQUEUE_API_KEY}
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/trainqueue
@@ -93,3 +102,6 @@ services:
 volumes:
   pgdata:
   mongodata:
+  kafkadata:
+  esdata:
+  localstackdata:

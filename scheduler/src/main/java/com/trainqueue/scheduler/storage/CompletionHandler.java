@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.Optional;
 
 /**
  * Persists artifacts and run metrics when an attempt ends. All best-effort: a
@@ -31,9 +32,14 @@ public class CompletionHandler {
         this.logProcessor = logProcessor;
     }
 
-    public void onSuccess(JobSubmittedEvent event, Instant startedAt, Instant finishedAt) {
+    public void onSuccess(JobSubmittedEvent event, Instant startedAt, Instant finishedAt,
+                          Optional<byte[]> artifact) {
         try {
-            artifacts.upload(event.jobId(), event.attempt());
+            if (artifact.isPresent()) {
+                artifacts.uploadBytes(event.jobId(), artifact.get()); // k8s: copied from the pod
+            } else {
+                artifacts.upload(event.jobId(), event.attempt());      // docker: host bind mount
+            }
         } catch (Exception e) {
             log.warn("artifact upload failed for {}: {}", event.jobId(), e.getMessage());
         }

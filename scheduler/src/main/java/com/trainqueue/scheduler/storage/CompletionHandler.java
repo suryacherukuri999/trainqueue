@@ -20,13 +20,15 @@ public class CompletionHandler {
     private final RunRepository runs;
     private final MetricsCollector metrics;
     private final EsLogIndexer es;
+    private final JobLogProcessor logProcessor;
 
-    public CompletionHandler(ArtifactStore artifacts, RunRepository runs,
-                             MetricsCollector metrics, EsLogIndexer es) {
+    public CompletionHandler(ArtifactStore artifacts, RunRepository runs, MetricsCollector metrics,
+                             EsLogIndexer es, JobLogProcessor logProcessor) {
         this.artifacts = artifacts;
         this.runs = runs;
         this.metrics = metrics;
         this.es = es;
+        this.logProcessor = logProcessor;
     }
 
     public void onSuccess(JobSubmittedEvent event, Instant startedAt, Instant finishedAt) {
@@ -37,7 +39,7 @@ public class CompletionHandler {
         }
         try {
             MetricsCollector.Snapshot snapshot = metrics.snapshot(event.jobId(), event.attempt());
-            runs.save(RunDocumentMapper.map(event, startedAt, finishedAt, snapshot));
+            runs.save(RunDocumentMapper.completed(event, startedAt, finishedAt, snapshot));
         } catch (Exception e) {
             log.warn("run-doc save failed for {}: {}", event.jobId(), e.getMessage());
         }
@@ -52,6 +54,7 @@ public class CompletionHandler {
 
     private void finish(JobSubmittedEvent event) {
         metrics.clear(event.jobId(), event.attempt());
+        logProcessor.clear(event);
         artifacts.cleanup(event.jobId(), event.attempt());
     }
 }

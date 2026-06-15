@@ -64,7 +64,7 @@ public class Reconciler {
                 log.info("stopping worker for {} (job {})", m.jobId(), job == null ? "unknown" : job.status());
                 launcher.stopAndRemove(m.handle());
             } else if ("RUNNING".equals(job.status()) && m.running()) {
-                scheduler.adopt(toEvent(job), m.handle());
+                scheduler.adopt(toEvent(job), m.handle(), job.startedAt());
             } else {
                 // worker not running, or job still QUEUED with a stale worker — reset and re-queue
                 launcher.remove(m.handle());

@@ -26,7 +26,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
 /**
@@ -98,7 +97,7 @@ public class KubernetesLauncher implements JobLauncher {
     }
 
     @Override
-    public void streamLogs(String jobName, long sinceEpochSecs, Consumer<String> onLine) {
+    public void streamLogs(String jobName, long sinceEpochSecs, LogSink sink) {
         pool.submit(() -> {
             try {
                 String pod = awaitPod(jobName);
@@ -106,6 +105,7 @@ public class KubernetesLauncher implements JobLauncher {
                     log.warn("no pod appeared for job {}", jobName);
                     return;
                 }
+                // K8s combines stdout+stderr into one stream; tag everything as non-stderr.
                 try (LogWatch watch = client.pods().inNamespace(NS).withName(pod).watchLog();
                      BufferedReader reader = new BufferedReader(
                              new InputStreamReader(watch.getOutput(), StandardCharsets.UTF_8))) {
@@ -113,7 +113,7 @@ public class KubernetesLauncher implements JobLauncher {
                     while ((line = reader.readLine()) != null) {
                         String trimmed = line.trim();
                         if (!trimmed.isEmpty()) {
-                            onLine.accept(trimmed);
+                            sink.accept(trimmed, false);
                         }
                     }
                 }

@@ -45,3 +45,4 @@ trainqueue:
     index: job-logs
     flush-count: 50
     flush-ms: 2000
+    spool-file: /tmp/trainqueue-es-spool.ndjson

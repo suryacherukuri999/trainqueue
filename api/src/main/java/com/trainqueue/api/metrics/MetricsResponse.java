@@ -1,5 +1,6 @@
 package com.trainqueue.api.metrics;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -9,10 +10,13 @@ public record MetricsResponse(
         long durationMs,
         int epochs,
         double finalAccuracy,
-        List<Double> lossCurve
+        List<Double> lossCurve,
+        Instant startedAt,
+        Instant finishedAt
 ) {
     public static MetricsResponse from(RunDocument doc) {
         return new MetricsResponse(doc.getJobId(), doc.getAttempt(), doc.getDurationMs(),
-                doc.getEpochs(), doc.getFinalAccuracy(), doc.getLossCurve());
+                doc.getEpochs(), doc.getFinalAccuracy(), doc.getLossCurve(),
+                doc.getStartedAt(), doc.getFinishedAt());
     }
 }

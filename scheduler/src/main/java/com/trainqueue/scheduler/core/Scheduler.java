@@ -163,8 +163,8 @@ public class Scheduler {
     }
 
     /** Re-attach to a worker container still running after a scheduler restart. */
-    public void adopt(JobSubmittedEvent event, String containerId) {
-        Instant startedAt = Instant.now();
+    public void adopt(JobSubmittedEvent event, String containerId, Instant originalStartedAt) {
+        Instant startedAt = originalStartedAt != null ? originalStartedAt : Instant.now();
         String outputDir = artifacts.outputDir(event.jobId(), event.attempt()).toString();
         lock.lock();
         try {
@@ -178,9 +178,9 @@ public class Scheduler {
         }
         redisStream.publishRunning(event, startedAt);
         launcher.watchExit(containerId, code -> onExit(event.jobId(), code));
-        // skip replaying history on re-adopt
-        launcher.streamLogs(containerId, startedAt.getEpochSecond(),
-                line -> logProcessor.process(event, startedAt, line));
+        // replay from the start so earlier epochs are recovered; stable log ids + epoch-keyed
+        // metrics keep the replay idempotent, and the original startedAt preserves duration
+        launcher.streamLogs(containerId, 0, (line, err) -> logProcessor.process(event, startedAt, line, err));
         log.info("re-adopted running job {} (container {})", event.jobId(), containerId);
     }
 
@@ -268,7 +268,7 @@ public class Scheduler {
         publisher.publishStatus(JobStatusEvent.now(event.jobId(), event.attempt(), JobStatus.RUNNING));
         redisStream.publishRunning(event, startedAt);
         launcher.watchExit(containerId, code -> onExit(event.jobId(), code));
-        launcher.streamLogs(containerId, 0, line -> logProcessor.process(event, startedAt, line));
+        launcher.streamLogs(containerId, 0, (line, err) -> logProcessor.process(event, startedAt, line, err));
         log.info("launched job {} attempt {} (container {})", event.jobId(), event.attempt(), containerId);
         if (cancelledDuringLaunch) {
             launcher.stopAndRemove(containerId);

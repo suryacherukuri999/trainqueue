@@ -19,7 +19,8 @@ public class RunDocument {
     private int epochs;
     private List<Double> lossCurve;
     private double finalAccuracy;
-    private Instant createdAt;
+    private Instant startedAt;
+    private Instant finishedAt;
 
     public String getId() {
         return id;
@@ -49,7 +50,11 @@ public class RunDocument {
         return finalAccuracy;
     }
 
-    public Instant getCreatedAt() {
-        return createdAt;
+    public Instant getStartedAt() {
+        return startedAt;
+    }
+
+    public Instant getFinishedAt() {
+        return finishedAt;
     }
 }

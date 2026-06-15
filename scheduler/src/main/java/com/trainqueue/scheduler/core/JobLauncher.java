@@ -4,7 +4,6 @@ import com.trainqueue.scheduler.messaging.JobSubmittedEvent;
 
 import java.util.List;
 import java.util.UUID;
-import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
 /**
@@ -17,8 +16,13 @@ public interface JobLauncher {
     /** Start a job; returns its handle. {@code outputDir} is a host path for artifacts (docker only). */
     String launch(JobSubmittedEvent event, String outputDir);
 
-    /** Follow the job's stdout, delivering one trimmed line at a time. */
-    void streamLogs(String handle, long sinceEpochSecs, Consumer<String> onLine);
+    /** Follow the job's stdout+stderr, delivering one trimmed line at a time. */
+    void streamLogs(String handle, long sinceEpochSecs, LogSink sink);
+
+    @FunctionalInterface
+    interface LogSink {
+        void accept(String line, boolean stderr);
+    }
 
     /** Fire {@code onExit} once with the exit code when the job stops. */
     void watchExit(String handle, IntConsumer onExit);

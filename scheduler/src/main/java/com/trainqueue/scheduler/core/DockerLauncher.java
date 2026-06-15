@@ -10,6 +10,7 @@ import com.github.dockerjava.api.model.Bind;
 import com.github.dockerjava.api.model.Container;
 import com.github.dockerjava.api.model.Frame;
 import com.github.dockerjava.api.model.HostConfig;
+import com.github.dockerjava.api.model.StreamType;
 import com.github.dockerjava.api.model.Volume;
 import com.github.dockerjava.api.model.WaitResponse;
 import com.trainqueue.scheduler.messaging.JobSubmittedEvent;
@@ -22,7 +23,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
 @Component
@@ -65,27 +65,32 @@ public class DockerLauncher implements JobLauncher {
     }
 
     /**
-     * Follow a container's stdout, delivering one trimmed line at a time.
-     * {@code sinceEpochSecs} of 0 replays from the start; pass "now" to skip history.
+     * Follow a container's stdout and stderr, delivering one trimmed line at a time
+     * (tagged with whether it came from stderr). {@code sinceEpochSecs} of 0 replays
+     * from the start; pass "now" to skip history.
      */
-    public void streamLogs(String containerId, long sinceEpochSecs, Consumer<String> onLine) {
+    @Override
+    public void streamLogs(String containerId, long sinceEpochSecs, LogSink sink) {
         docker.logContainerCmd(containerId)
                 .withStdOut(true)
-                .withStdErr(false)
+                .withStdErr(true)
                 .withFollowStream(true)
                 .withSince((int) sinceEpochSecs)
                 .exec(new ResultCallback.Adapter<>() {
-                    private final StringBuilder buffer = new StringBuilder();
+                    private final StringBuilder out = new StringBuilder();
+                    private final StringBuilder err = new StringBuilder();
 
                     @Override
                     public void onNext(Frame frame) {
+                        boolean isErr = frame.getStreamType() == StreamType.STDERR;
+                        StringBuilder buffer = isErr ? err : out;
                         buffer.append(new String(frame.getPayload(), StandardCharsets.UTF_8));
                         int newline;
                         while ((newline = buffer.indexOf("\n")) >= 0) {
                             String line = buffer.substring(0, newline).trim();
                             buffer.delete(0, newline + 1);
                             if (!line.isEmpty()) {
-                                onLine.accept(line);
+                                sink.accept(line, isErr);
                             }
                         }
                     }

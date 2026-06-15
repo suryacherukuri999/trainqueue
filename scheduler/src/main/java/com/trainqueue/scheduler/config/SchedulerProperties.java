@@ -28,6 +28,6 @@ public record SchedulerProperties(
     public record S3(String endpoint, String region, String bucket, String accessKey, String secretKey) {
     }
 
-    public record Es(String index, int flushCount, long flushMs) {
+    public record Es(String index, int flushCount, long flushMs, String spoolFile) {
     }
 }

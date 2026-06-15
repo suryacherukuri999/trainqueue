@@ -7,7 +7,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/** Per-attempt run metrics persisted to MongoDB (trainqueue.runs). */
+/** Per-attempt run metrics persisted to MongoDB (trainqueue.runs), upserted by id. */
 @Document("runs")
 public class RunDocument {
 
@@ -19,13 +19,14 @@ public class RunDocument {
     private int epochs;
     private List<Double> lossCurve;
     private double finalAccuracy;
-    private Instant createdAt;
+    private Instant startedAt;
+    private Instant finishedAt;
 
     public RunDocument() {
     }
 
     public RunDocument(String id, UUID jobId, int attempt, long durationMs, int epochs,
-                       List<Double> lossCurve, double finalAccuracy, Instant createdAt) {
+                       List<Double> lossCurve, double finalAccuracy, Instant startedAt, Instant finishedAt) {
         this.id = id;
         this.jobId = jobId;
         this.attempt = attempt;
@@ -33,7 +34,8 @@ public class RunDocument {
         this.epochs = epochs;
         this.lossCurve = lossCurve;
         this.finalAccuracy = finalAccuracy;
-        this.createdAt = createdAt;
+        this.startedAt = startedAt;
+        this.finishedAt = finishedAt;
     }
 
     public String getId() {
@@ -64,7 +66,11 @@ public class RunDocument {
         return finalAccuracy;
     }
 
-    public Instant getCreatedAt() {
-        return createdAt;
+    public Instant getStartedAt() {
+        return startedAt;
+    }
+
+    public Instant getFinishedAt() {
+        return finishedAt;
     }
 }

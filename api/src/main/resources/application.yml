@@ -32,6 +32,11 @@ server:
   port: 8080
 
 trainqueue:
+  api-key: ${TRAINQUEUE_API_KEY:dev-key}
+  limits:
+    max-epochs: 200
+    max-cpu-millis: 4000
+    max-mem-mb: 8192
   topics:
     submitted: jobs.submitted
     status: jobs.status

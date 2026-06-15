@@ -19,7 +19,10 @@ public class ApiClient {
     private final ObjectMapper mapper;
 
     public ApiClient(SchedulerProperties props, ObjectMapper mapper) {
-        this.client = RestClient.builder().baseUrl(props.api().baseUrl()).build();
+        this.client = RestClient.builder()
+                .baseUrl(props.api().baseUrl())
+                .defaultHeader("X-API-Key", props.api().key())
+                .build();
         this.mapper = mapper;
     }
 

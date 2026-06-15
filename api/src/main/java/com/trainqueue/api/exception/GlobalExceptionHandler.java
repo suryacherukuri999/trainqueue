@@ -31,6 +31,12 @@ public class GlobalExceptionHandler {
                 .body(new ApiError(HttpStatus.CONFLICT, ex.getMessage()));
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiError> badRequest(IllegalArgumentException ex) {
+        return ResponseEntity.badRequest()
+                .body(new ApiError(HttpStatus.BAD_REQUEST, ex.getMessage()));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> validation(MethodArgumentNotValidException ex) {
         Map<String, String> fields = ex.getBindingResult().getFieldErrors().stream()

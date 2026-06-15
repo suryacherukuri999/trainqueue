@@ -16,7 +16,7 @@ public record SchedulerProperties(
     public record Topics(String submitted, String status, String control) {
     }
 
-    public record Api(String baseUrl) {
+    public record Api(String baseUrl, String key) {
     }
 
     public record Pool(int cpuMillis, int memMb) {

@@ -11,6 +11,7 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Comparator;
 import java.util.Optional;
 import java.util.UUID;
@@ -42,6 +43,12 @@ public class ArtifactStore {
     public Path prepareOutputDir(UUID jobId, int attempt) throws IOException {
         Path dir = outputDir(jobId, attempt);
         Files.createDirectories(dir);
+        // the worker runs non-root; let its uid write the artifact into this bind mount
+        try {
+            Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwxrwxrwx"));
+        } catch (UnsupportedOperationException | IOException ignored) {
+            // non-POSIX fs (e.g. Windows) — skip
+        }
         return dir;
     }
 

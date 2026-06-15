@@ -27,6 +27,7 @@ trainqueue:
     control: jobs.control
   api:
     base-url: http://localhost:8080
+    key: ${TRAINQUEUE_API_KEY:dev-key}
   pool:
     cpu-millis: 4000
     mem-mb: 8192

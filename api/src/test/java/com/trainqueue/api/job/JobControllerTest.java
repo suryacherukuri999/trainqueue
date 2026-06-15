@@ -5,6 +5,7 @@ import com.trainqueue.api.exception.JobNotFoundException;
 import com.trainqueue.api.job.dto.CreateJobRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
@@ -24,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(JobController.class)
+@AutoConfigureMockMvc(addFilters = false) // controller-logic slice; security covered separately
 class JobControllerTest {
 
     @Autowired
@@ -47,7 +49,7 @@ class JobControllerTest {
         mvc.perform(post("/api/jobs")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(new CreateJobRequest(
-                                "demo", 5, 1, null, null, null, null, null))))
+                                "demo", 5, 1, null, null, null, null))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("demo"))
                 .andExpect(jsonPath("$.status").value("QUEUED"));
@@ -59,7 +61,7 @@ class JobControllerTest {
         mvc.perform(post("/api/jobs")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(new CreateJobRequest(
-                                "", 0, null, null, null, null, null, null))))
+                                "", 0, null, null, null, null, null))))
                 .andExpect(status().isBadRequest());
 
         verify(service, never()).create(any());

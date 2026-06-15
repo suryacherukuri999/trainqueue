@@ -32,11 +32,17 @@ public class JobService {
     private final String defaultImage;
     private final String submittedTopic;
     private final String controlTopic;
+    private final int maxEpochs;
+    private final int maxCpuMillis;
+    private final int maxMemMb;
 
     public JobService(JobRepository jobs, OutboxRepository outbox, JobStateCache cache, ObjectMapper mapper,
                       @Value("${trainqueue.default-image:worker-sim:latest}") String defaultImage,
                       @Value("${trainqueue.topics.submitted}") String submittedTopic,
-                      @Value("${trainqueue.topics.control}") String controlTopic) {
+                      @Value("${trainqueue.topics.control}") String controlTopic,
+                      @Value("${trainqueue.limits.max-epochs:200}") int maxEpochs,
+                      @Value("${trainqueue.limits.max-cpu-millis:4000}") int maxCpuMillis,
+                      @Value("${trainqueue.limits.max-mem-mb:8192}") int maxMemMb) {
         this.jobs = jobs;
         this.outbox = outbox;
         this.cache = cache;
@@ -44,21 +50,26 @@ public class JobService {
         this.defaultImage = defaultImage;
         this.submittedTopic = submittedTopic;
         this.controlTopic = controlTopic;
+        this.maxEpochs = maxEpochs;
+        this.maxCpuMillis = maxCpuMillis;
+        this.maxMemMb = maxMemMb;
     }
 
     @Transactional
     public Job create(CreateJobRequest req) {
-        String image = req.dockerImage() == null ? defaultImage : req.dockerImage();
+        int cpuMillis = req.cpuMillis() == null ? 1000 : req.cpuMillis();
+        int memMb = req.memMb() == null ? 1024 : req.memMb();
+        enforceLimits(req.epochs(), cpuMillis, memMb);
         Job job = new Job(
                 UUID.randomUUID(),
                 req.name(),
-                image,
+                defaultImage, // server-selected; clients cannot choose the image
                 null,
                 req.epochs(),
                 req.failAtEpoch(),
                 req.priority() == null ? 1 : req.priority(),
-                req.cpuMillis() == null ? 1000 : req.cpuMillis(),
-                req.memMb() == null ? 1024 : req.memMb(),
+                cpuMillis,
+                memMb,
                 req.maxRetries() == null ? 0 : req.maxRetries());
         jobs.save(job);
 
@@ -107,6 +118,18 @@ public class JobService {
                 toJson(new CancelCommand(eventId, id))));
         cache.evict(id);
         return job;
+    }
+
+    private void enforceLimits(int epochs, int cpuMillis, int memMb) {
+        if (epochs > maxEpochs) {
+            throw new IllegalArgumentException("epochs exceeds limit " + maxEpochs);
+        }
+        if (cpuMillis > maxCpuMillis) {
+            throw new IllegalArgumentException("cpuMillis exceeds limit " + maxCpuMillis);
+        }
+        if (memMb > maxMemMb) {
+            throw new IllegalArgumentException("memMb exceeds limit " + maxMemMb);
+        }
     }
 
     private String toJson(Object value) {

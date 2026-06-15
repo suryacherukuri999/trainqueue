@@ -7,6 +7,7 @@ import com.github.dockerjava.api.command.InspectContainerResponse;
 import com.github.dockerjava.api.command.WaitContainerResultCallback;
 import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.model.Bind;
+import com.github.dockerjava.api.model.Capability;
 import com.github.dockerjava.api.model.Container;
 import com.github.dockerjava.api.model.Frame;
 import com.github.dockerjava.api.model.HostConfig;
@@ -53,7 +54,11 @@ public class DockerLauncher implements JobLauncher {
         HostConfig hostConfig = HostConfig.newHostConfig()
                 .withNanoCPUs((long) e.cpuMillis() * 1_000_000L) // 1000 millis == 1 CPU == 1e9 nanos
                 .withMemory((long) e.memMb() * 1024L * 1024L)
-                .withBinds(new Bind(hostOutputDir, new Volume("/output")));
+                .withBinds(new Bind(hostOutputDir, new Volume("/output")))
+                // hardening: untrusted training jobs get no network, no extra caps, no priv-escalation
+                .withNetworkMode("none")
+                .withCapDrop(Capability.ALL)
+                .withSecurityOpts(List.of("no-new-privileges"));
 
         CreateContainerResponse created = docker.createContainerCmd(e.dockerImage())
                 .withName(name)

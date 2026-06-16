@@ -7,6 +7,13 @@ Submit a job in the browser; a scheduler places and runs it in a container; its
 logs, status, and loss curve stream back live; and its logs, artifacts, and run
 metrics are persisted for search and download.
 
+## Demo
+![TrainQueue dashboard](screenshots/jobs.png)
+
+Open a job to watch its status, live logs, and loss curve stream in:
+
+![TrainQueue live job view](screenshots/demo.gif)
+
 ## Tech stack
 | Area | Technologies |
 |---|---|

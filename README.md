@@ -102,7 +102,3 @@ cd scheduler && ./mvnw test   # resource pool/capacity, ordering, retry policy, 
 cd gateway && npm test        # subscription registry + fan-out
 cd console && npm test        # job table render + detail reducer
 ```
-
-## Demo
-Screenshots and a demo gif live in [screenshots/](screenshots/) (submit → live
-logs → loss curve → search).

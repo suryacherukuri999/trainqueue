@@ -11,51 +11,63 @@ interface Props {
 
 export function JobTable({ jobs, onCancel, onDelete }: Props) {
   if (jobs.length === 0) {
-    return <p className="empty">No jobs yet. Submit one above.</p>;
+    return (
+      <div className="empty-state">
+        <div className="empty-icon" aria-hidden="true">
+          +
+        </div>
+        <h3>No jobs in the queue</h3>
+        <p>Submit a training job above and it will appear here with live status updates.</p>
+      </div>
+    );
   }
 
   return (
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Status</th>
-          <th>Epochs</th>
-          <th>Priority</th>
-          <th>Attempt</th>
-          <th>Created</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {jobs.map((job) => (
-          <tr key={job.id}>
-            <td>
-              <Link to={`/jobs/${job.id}`}>{job.name}</Link>
-            </td>
-            <td>
-              <StatusBadge status={job.status} />
-            </td>
-            <td>{job.epochs}</td>
-            <td>{job.priority}</td>
-            <td>{job.attempt}</td>
-            <td>{new Date(job.createdAt).toLocaleTimeString()}</td>
-            <td>
-              <div className="row-actions">
-                <button
-                  onClick={() => onCancel(job.id)}
-                  disabled={TERMINAL.has(job.status)}
-                >
-                  Cancel
-                </button>
-                <button className="danger-button" onClick={() => onDelete(job.id)}>
-                  Delete
-                </button>
-              </div>
-            </td>
+    <div className="table-shell">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Epochs</th>
+            <th>Priority</th>
+            <th>Attempt</th>
+            <th>Created</th>
+            <th></th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {jobs.map((job) => (
+            <tr key={job.id} className={`job-row status-${job.status.toLowerCase()}`}>
+              <td>
+                <Link className="job-link" to={`/jobs/${job.id}`}>
+                  {job.name}
+                </Link>
+              </td>
+              <td>
+                <StatusBadge status={job.status} />
+              </td>
+              <td>{job.epochs}</td>
+              <td>{job.priority}</td>
+              <td>{job.attempt}</td>
+              <td>{new Date(job.createdAt).toLocaleTimeString()}</td>
+              <td>
+                <div className="row-actions">
+                  <button
+                    onClick={() => onCancel(job.id)}
+                    disabled={TERMINAL.has(job.status)}
+                  >
+                    Cancel
+                  </button>
+                  <button className="danger-button" onClick={() => onDelete(job.id)}>
+                    Delete
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

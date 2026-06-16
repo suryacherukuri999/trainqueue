@@ -85,6 +85,6 @@ describe("JobTable", () => {
     render(<JobTable jobs={[]} onCancel={() => {}} onDelete={() => {}} />, {
       wrapper: MemoryRouter,
     });
-    expect(screen.getByText(/no jobs yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/no jobs in the queue/i)).toBeInTheDocument();
   });
 });

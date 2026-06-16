@@ -8,10 +8,16 @@ export default function App() {
       <header className="topbar">
         <div className="topbar-inner">
           <Link to="/" className="brand">
-            <span className="brand-mark">◤</span>
-            <span className="brand-name">TrainQueue</span>
-            <span className="brand-sub">ML Training Scheduler</span>
+            <span className="brand-mark" aria-hidden="true" />
+            <span className="brand-copy">
+              <span className="brand-name">TrainQueue</span>
+              <span className="brand-sub">ML Training Scheduler</span>
+            </span>
           </Link>
+          <div className="topbar-pill">
+            <span className="live-dot" />
+            Local demo
+          </div>
         </div>
       </header>
       <main>

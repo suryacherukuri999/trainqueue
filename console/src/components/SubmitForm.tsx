@@ -36,11 +36,16 @@ export function SubmitForm({ onSubmit }: Props) {
 
   return (
     <form onSubmit={submit} className="submit-form">
-      <label>
+      <label className="field field-wide">
         Name
-        <input value={name} onChange={(e) => setName(e.target.value)} required />
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. resnet-smoke-test"
+          required
+        />
       </label>
-      <label>
+      <label className="field">
         Epochs
         <input
           type="number"
@@ -50,7 +55,7 @@ export function SubmitForm({ onSubmit }: Props) {
           onChange={(e) => setEpochs(e.target.value)}
         />
       </label>
-      <label>
+      <label className="field">
         Priority
         <input
           type="number"
@@ -60,7 +65,7 @@ export function SubmitForm({ onSubmit }: Props) {
           onChange={(e) => setPriority(e.target.value)}
         />
       </label>
-      <label>
+      <label className="field">
         Fail at epoch
         <input
           type="number"
@@ -70,7 +75,7 @@ export function SubmitForm({ onSubmit }: Props) {
           onChange={(e) => setFailAtEpoch(e.target.value)}
         />
       </label>
-      <label>
+      <label className="field">
         Max retries
         <input
           type="number"
@@ -80,7 +85,7 @@ export function SubmitForm({ onSubmit }: Props) {
           onChange={(e) => setMaxRetries(e.target.value)}
         />
       </label>
-      <button type="submit" className="btn-primary">Submit job</button>
+      <button type="submit" className="btn-primary submit-button">Submit job</button>
     </form>
   );
 }

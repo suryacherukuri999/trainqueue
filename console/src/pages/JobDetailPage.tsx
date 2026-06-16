@@ -1,9 +1,10 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { getJob } from "../api";
+import { getJob, getMetrics, searchLogs } from "../api";
 import { StatusBadge } from "../components/StatusBadge";
-import { JobInsights } from "../detail/JobInsights";
 import { useJobStream } from "../detail/useJobStream";
+import type { MetricPoint } from "../detail/detailReducer";
+import { TERMINAL } from "../types";
 import type { Job } from "../types";
 
 const LossChart = lazy(() => import("../detail/LossChart"));
@@ -18,6 +19,8 @@ export function JobDetailPage() {
 function JobDetail({ id }: { id: string }) {
   const [job, setJob] = useState<Job | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [savedPoints, setSavedPoints] = useState<MetricPoint[]>([]);
+  const [savedLogs, setSavedLogs] = useState<string[]>([]);
   const { state, connected } = useJobStream(id);
 
   useEffect(() => {
@@ -27,6 +30,26 @@ function JobDetail({ id }: { id: string }) {
   }, [id]);
 
   const status = state.status ?? job?.status ?? null;
+  const terminal = status ? TERMINAL.has(status) : false;
+
+  // A finished job has no live stream to replay, so load its persisted loss curve
+  // (Mongo) and logs (Elasticsearch) so the panels aren't empty.
+  useEffect(() => {
+    if (!terminal) return;
+    getMetrics(id)
+      .then((m) =>
+        setSavedPoints(m ? m.lossCurve.map((loss, i) => ({ epoch: i + 1, loss, accuracy: 0 })) : []),
+      )
+      .catch(() => undefined);
+    searchLogs(id, "")
+      .then((lines) =>
+        setSavedLogs(lines.map((l) => `${new Date(l.ts).toLocaleTimeString()}  ${l.message}`)),
+      )
+      .catch(() => undefined);
+  }, [id, terminal]);
+
+  const points = state.points.length ? state.points : savedPoints;
+  const logs = state.logs.length ? state.logs : savedLogs;
 
   return (
     <section>
@@ -57,21 +80,27 @@ function JobDetail({ id }: { id: string }) {
         <div className="card-head">
           <h2 className="card-title">Loss curve</h2>
         </div>
-        <Suspense fallback={<p className="empty">loading chart…</p>}>
-          <LossChart points={state.points} />
-        </Suspense>
+        {points.length === 0 ? (
+          <p className="empty">{terminal ? "no loss data recorded for this run" : "waiting for epochs…"}</p>
+        ) : (
+          <Suspense fallback={<p className="empty">loading chart…</p>}>
+            <LossChart points={points} />
+          </Suspense>
+        )}
       </section>
 
       <section className="card">
         <div className="card-head">
-          <h2 className="card-title">Live log</h2>
+          <h2 className="card-title">{terminal ? "Logs" : "Live log"}</h2>
         </div>
         <pre className="log">
-          {state.logs.length === 0 ? "waiting for events…" : state.logs.join("\n")}
+          {logs.length === 0
+            ? terminal
+              ? "no logs recorded"
+              : "waiting for events…"
+            : logs.join("\n")}
         </pre>
       </section>
-
-      <JobInsights id={id} status={status} />
     </section>
   );
 }

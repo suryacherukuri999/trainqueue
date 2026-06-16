@@ -13,9 +13,6 @@ export function JobTable({ jobs, onCancel, onDelete }: Props) {
   if (jobs.length === 0) {
     return (
       <div className="empty-state">
-        <div className="empty-icon" aria-hidden="true">
-          +
-        </div>
         <h3>No jobs in the queue</h3>
         <p>Submit a training job above and it will appear here with live status updates.</p>
       </div>

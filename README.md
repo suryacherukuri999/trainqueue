@@ -95,12 +95,6 @@ run/test commands and a deeper tour of what it does.
 - **CI** — [.github/workflows/ci.yml](.github/workflows/ci.yml): build + test all services on push/PR; push images to GHCR on `main`.
 - **Deploy** — [.github/workflows/deploy.yml](.github/workflows/deploy.yml) (manual) → EC2 via [deploy/aws/docker-compose.prod.yml](deploy/aws/docker-compose.prod.yml).
 
-## Security & honest limitations
-- **Fault tolerance has a boundary — it isn't unconditional.** The correctness backbone is **Postgres** (the job table + the api's transactional outbox) and **Kafka** (decoupled delivery). Against those, the system tolerates a broker outage, a scheduler restart mid-job (reconcile re-adopts or re-queues), and a restart during a retry's backoff (the durable scheduler outbox fires the retry exactly once). **Mongo, Elasticsearch, Redis, and S3 are best-effort** telemetry/cache/artifact stores: the scheduler's status+retry outbox lives in Mongo, so while **Mongo** is down status events and run metrics aren't recorded (calls fail fast and resume when it returns) — status can lag or be missed. I don't claim tolerance against losing those stores.
-- **API auth is a shared key, not user auth.** The api requires an `X-API-Key`, and the console ships with it baked in (`VITE_API_KEY`). That gates service-to-service calls and casual access, but a key shipped to the browser is readable by anyone who loads the page — it is **not** real end-user authentication or multi-tenancy. A production build would put real auth in front (OIDC / a backend-for-frontend that holds the key server-side).
-- **K8s artifacts are uploaded by the worker, not copied by the scheduler.** A finished Job's pod is terminated, so its filesystem can't be copied after the fact. Under `LAUNCHER=k8s` the worker uploads its own `model.bin` to S3 (`ARTIFACT_S3_*` env). Under `LAUNCHER=docker` the worker stays network-isolated and the scheduler harvests the file from the stopped container instead.
-- **Untrusted jobs are sandboxed.** Docker workers run with `--network none`, dropped capabilities, no privilege escalation, non-root. K8s workers run non-root with a read-only rootfs, dropped capabilities, `RuntimeDefault` seccomp, and a [NetworkPolicy](deploy/k8s/networkpolicy.yaml) that denies ingress and limits egress to DNS + the in-namespace S3 endpoint (needs a NetworkPolicy-enforcing CNI, e.g. `minikube start --cni=calico`).
-
 ## Tests
 ```bash
 cd api && ./mvnw test         # state machine, controller, ES query-builder, outbox relay (kafka-down)

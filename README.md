@@ -1,5 +1,7 @@
 # TrainQueue
 
+[![ci](https://github.com/suryacherukuri999/trainqueue/actions/workflows/ci.yml/badge.svg)](https://github.com/suryacherukuri999/trainqueue/actions/workflows/ci.yml)
+
 A self-serve platform for launching and monitoring distributed ML training jobs.
 Submit a job in the browser; a scheduler places and runs it in a container; its
 logs, status, and loss curve stream back live; and its logs, artifacts, and run

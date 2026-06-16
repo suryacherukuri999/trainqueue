@@ -5,11 +5,18 @@ Submit a job in the browser; a scheduler places and runs it in a container; its
 logs, status, and loss curve stream back live; and its logs, artifacts, and run
 metrics are persisted for search and download.
 
-**Why it exists:** it's a compact but realistic distributed system — an
-event-driven microservice architecture with a message broker, a resource-aware
-scheduler, fault tolerance (retries, heartbeats, crash recovery), live streaming,
-polyglot persistence, containers/Kubernetes, and CI/CD — the kind of moving parts
-a real job platform has, small enough to read end to end.
+## Tech stack
+| Area | Technologies |
+|---|---|
+| Languages | Java 21 · TypeScript · Python |
+| API | Spring Boot 3 · Spring Data JPA / Hibernate · Flyway · Spring Security |
+| Frontend | React 18 · Vite · Recharts |
+| Real-time | WebSocket (ws) · Redis pub/sub |
+| Messaging | Apache Kafka |
+| Storage | PostgreSQL · MongoDB · Elasticsearch · Redis · S3 (LocalStack) |
+| Infra | Docker · Kubernetes (fabric8 / minikube) |
+| CI/CD & cloud | GitHub Actions · GHCR · AWS EC2 / S3 |
+| Testing | JUnit 5 · Vitest · Jest |
 
 ## Architecture
 
@@ -83,12 +90,6 @@ Submit a job and click its name for the live detail
 page (status, streaming logs, loss curve). After it finishes, use the metrics,
 artifact download, and log-search controls. Each service README has its own
 run/test commands and a deeper tour of what it does.
-
-## What to try
-- **Capacity** — run the scheduler with `TRAINQUEUE_POOL_CPUMILLIS=2000`; submit several jobs → exactly 2 run at once.
-- **Retry** — submit with a fail-at-epoch and max-retries > 0 → it fails, retries with backoff, then FAILED.
-- **Crash recovery** — start a long job, Ctrl-C the scheduler, restart it → it reconciles and re-adopts or re-queues.
-- **Live + search** — two browser tabs on one job stream identically; after completion, search its logs and narrow by time.
 
 ## Kubernetes, CI/CD, and deploy
 - **Kubernetes** — `LAUNCHER=k8s` runs each job as a K8s Job (fabric8). See [scheduler/README](scheduler/README.md#run-on-minikube) and [deploy/k8s/](deploy/k8s/README.md).

@@ -53,6 +53,9 @@ export function JobTable({ jobs, onCancel, onDelete }: Props) {
               <td>{new Date(job.createdAt).toLocaleTimeString()}</td>
               <td>
                 <div className="row-actions">
+                  <Link className="view-button" to={`/jobs/${job.id}`}>
+                    View
+                  </Link>
                   <button
                     onClick={() => onCancel(job.id)}
                     disabled={TERMINAL.has(job.status)}

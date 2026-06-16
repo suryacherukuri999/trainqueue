@@ -70,18 +70,11 @@ export function JobsPage() {
 
   return (
     <>
-      <section className="hero">
-        <div>
-          <p className="eyebrow">Distributed training queue</p>
-          <h1>Launch, watch, and manage ML jobs from one control panel.</h1>
-          <p className="hero-copy">
-            Submit simulated training runs, track retries and terminal states, inspect logs,
-            and clean up finished jobs when your demo board gets busy.
-          </p>
-        </div>
-        <div className="hero-orb" aria-hidden="true">
-          <span />
-        </div>
+      <section className="page-head">
+        <h1>Training jobs</h1>
+        <p className="page-sub">
+          Submit runs and open any job to watch its status, live logs, and loss curve stream in.
+        </p>
       </section>
 
       <section className="stats-grid" aria-label="Queue summary">

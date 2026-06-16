@@ -82,7 +82,7 @@ export function JobInsights({ id, status }: { id: string; status: JobStatus | nu
         <div className="card-head">
           <h2 className="card-title">Log search</h2>
         </div>
-        <form onSubmit={runSearch} className="submit-form">
+        <form onSubmit={runSearch} className="search-form">
           <label>
             Contains
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. epoch" />

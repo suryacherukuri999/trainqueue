@@ -31,30 +31,45 @@ function JobDetail({ id }: { id: string }) {
   return (
     <section>
       <p>
-        <Link to="/">← all jobs</Link>
+        <Link to="/" className="back-link">
+          ← all jobs
+        </Link>
       </p>
-      <h2>
-        {job?.name ?? id}{" "}
-        {status && <StatusBadge status={status} />}{" "}
-        <span className="conn">{connected ? "● live" : "○ reconnecting"}</span>
-      </h2>
-      {error && <p className="error">{error}</p>}
-      {job && (
-        <p className="meta">
-          image {job.dockerImage} · epochs {job.epochs} · priority {job.priority} · attempt{" "}
-          {state.attempt ?? job.attempt} · maxRetries {job.maxRetries}
-        </p>
-      )}
 
-      <h3>Loss</h3>
-      <Suspense fallback={<p className="conn">loading chart…</p>}>
-        <LossChart points={state.points} />
-      </Suspense>
+      <section className="card">
+        <div className="detail-head">
+          <h2>{job?.name ?? id}</h2>
+          {status && <StatusBadge status={status} />}
+          <span className={connected ? "conn live" : "conn"}>
+            {connected ? "● live" : "○ reconnecting"}
+          </span>
+        </div>
+        {error && <p className="error">{error}</p>}
+        {job && (
+          <p className="meta">
+            image {job.dockerImage} · epochs {job.epochs} · priority {job.priority} · attempt{" "}
+            {state.attempt ?? job.attempt} · maxRetries {job.maxRetries}
+          </p>
+        )}
+      </section>
 
-      <h3>Live log</h3>
-      <pre className="log">
-        {state.logs.length === 0 ? "waiting for events…" : state.logs.join("\n")}
-      </pre>
+      <section className="card">
+        <div className="card-head">
+          <h2 className="card-title">Loss curve</h2>
+        </div>
+        <Suspense fallback={<p className="empty">loading chart…</p>}>
+          <LossChart points={state.points} />
+        </Suspense>
+      </section>
+
+      <section className="card">
+        <div className="card-head">
+          <h2 className="card-title">Live log</h2>
+        </div>
+        <pre className="log">
+          {state.logs.length === 0 ? "waiting for events…" : state.logs.join("\n")}
+        </pre>
+      </section>
 
       <JobInsights id={id} status={status} />
     </section>

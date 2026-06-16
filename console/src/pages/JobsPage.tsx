@@ -65,18 +65,28 @@ export function JobsPage() {
 
   return (
     <>
-      <SubmitForm onSubmit={handleSubmit} />
+      <section className="card">
+        <div className="card-head">
+          <h2 className="card-title">Submit a job</h2>
+        </div>
+        <SubmitForm onSubmit={handleSubmit} />
+      </section>
+
       {error && <p className="error">{error}</p>}
-      <div className="table-toolbar">
-        <button
-          className="danger-button"
-          onClick={handleDeleteAll}
-          disabled={jobs.length === 0}
-        >
-          Delete all jobs
-        </button>
-      </div>
-      <JobTable jobs={jobs} onCancel={handleCancel} onDelete={handleDelete} />
+
+      <section className="card">
+        <div className="card-head">
+          <h2 className="card-title">Jobs{jobs.length > 0 && ` · ${jobs.length}`}</h2>
+          <button
+            className="danger-button"
+            onClick={handleDeleteAll}
+            disabled={jobs.length === 0}
+          >
+            Delete all
+          </button>
+        </div>
+        <JobTable jobs={jobs} onCancel={handleCancel} onDelete={handleDelete} />
+      </section>
     </>
   );
 }

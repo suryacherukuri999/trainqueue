@@ -11,7 +11,7 @@ interface Props {
 
 export function JobTable({ jobs, onCancel, onDelete }: Props) {
   if (jobs.length === 0) {
-    return <p>No jobs yet. Submit one above.</p>;
+    return <p className="empty">No jobs yet. Submit one above.</p>;
   }
 
   return (

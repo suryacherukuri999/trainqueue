@@ -55,53 +55,61 @@ export function JobInsights({ id, status }: { id: string; status: JobStatus | nu
   }
 
   return (
-    <section className="insights">
-      <h3>
-        Metrics{" "}
-        <button type="button" onClick={refresh} className="link-btn">
-          refresh
-        </button>
-      </h3>
-      {metrics ? (
-        <p className="meta">
-          final accuracy {metrics.finalAccuracy.toFixed(4)} · {metrics.epochs} epochs ·{" "}
-          {(metrics.durationMs / 1000).toFixed(1)}s ·{" "}
-          {artifact ? (
-            <a href={artifact}>download artifact</a>
-          ) : (
-            <span className="conn">no artifact</span>
-          )}
-        </p>
-      ) : (
-        <p className="conn">no recorded run yet (available after the job completes)</p>
-      )}
+    <>
+      <section className="card">
+        <div className="card-head">
+          <h2 className="card-title">Metrics</h2>
+          <button type="button" onClick={refresh} className="link-btn">
+            refresh
+          </button>
+        </div>
+        {metrics ? (
+          <p className="meta">
+            final accuracy {metrics.finalAccuracy.toFixed(4)} · {metrics.epochs} epochs ·{" "}
+            {(metrics.durationMs / 1000).toFixed(1)}s ·{" "}
+            {artifact ? (
+              <a href={artifact}>download artifact</a>
+            ) : (
+              <span className="conn">no artifact</span>
+            )}
+          </p>
+        ) : (
+          <p className="empty">no recorded run yet (available after the job completes)</p>
+        )}
+      </section>
 
-      <h3>Log search</h3>
-      <form onSubmit={runSearch} className="submit-form">
-        <label>
-          Contains
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. epoch" />
-        </label>
-        <label>
-          From
-          <input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} />
-        </label>
-        <label>
-          To
-          <input type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} />
-        </label>
-        <button type="submit">Search</button>
-      </form>
-      {searchError && <p className="error">{searchError}</p>}
-      {results && (
-        <pre className="log">
-          {results.length === 0
-            ? "no matching log lines"
-            : results
-                .map((l) => `${new Date(l.ts).toLocaleTimeString()}  ${l.message}`)
-                .join("\n")}
-        </pre>
-      )}
-    </section>
+      <section className="card">
+        <div className="card-head">
+          <h2 className="card-title">Log search</h2>
+        </div>
+        <form onSubmit={runSearch} className="submit-form">
+          <label>
+            Contains
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. epoch" />
+          </label>
+          <label>
+            From
+            <input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} />
+          </label>
+          <label>
+            To
+            <input type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} />
+          </label>
+          <button type="submit" className="btn-primary">
+            Search
+          </button>
+        </form>
+        {searchError && <p className="error">{searchError}</p>}
+        {results && (
+          <pre className="log">
+            {results.length === 0
+              ? "no matching log lines"
+              : results
+                  .map((l) => `${new Date(l.ts).toLocaleTimeString()}  ${l.message}`)
+                  .join("\n")}
+          </pre>
+        )}
+      </section>
+    </>
   );
 }

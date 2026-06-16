@@ -80,7 +80,7 @@ export function SubmitForm({ onSubmit }: Props) {
           onChange={(e) => setMaxRetries(e.target.value)}
         />
       </label>
-      <button type="submit">Submit job</button>
+      <button type="submit" className="btn-primary">Submit job</button>
     </form>
   );
 }
